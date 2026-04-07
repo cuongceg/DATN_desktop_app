@@ -37,6 +37,9 @@ dependencies:
   web_socket_channel: ^3.0.3
   google_generative_ai: ^0.4.7
   rxdart: ^0.28.0
+  flutter_reaction_button: ^3.0.0+3
+  syncfusion_flutter_calendar: ^33.1.46
+  window_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:

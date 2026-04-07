@@ -1,0 +1,198 @@
+import 'package:flutter/material.dart';
+
+import '../../models/classroom.dart';
+import '../calendar/calendar_screen.dart';
+import '../class_management/class_management_screen.dart';
+import '../../widgets/sidebar_navigation.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({
+    super.key,
+    required this.isTeacher,
+    required this.classrooms,
+    required this.onLogout,
+    required this.onToggleTheme,
+  });
+
+  final bool isTeacher;
+  final List<Classroom> classrooms;
+  final VoidCallback onLogout;
+  final VoidCallback onToggleTheme;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedNav = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Row(
+          children: [
+            SidebarNavigation(
+              selectedIndex: _selectedNav,
+              onDestinationSelected: (index) {
+                setState(() {
+                  _selectedNav = index;
+                });
+              },
+            ),
+            Expanded(
+              child: Container(
+                color: scheme.surface,
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HeaderArea(
+                      onToggleTheme: widget.onToggleTheme,
+                      onLogout: widget.onLogout,
+                    ),
+                    const SizedBox(height: 20),
+                    Expanded(child: _buildBody()),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_selectedNav) {
+      case 0:
+        return const _CenterTextScreen(text: 'Thong bao');
+      case 1:
+        return ClassManagementScreen(
+          isTeacher: widget.isTeacher,
+          classrooms: widget.classrooms,
+        );
+      case 2:
+        return const CalendarDesktopScreen();
+      case 3:
+        return const _CenterTextScreen(text: 'Cai dat');
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+class _HeaderArea extends StatelessWidget {
+  const _HeaderArea({required this.onToggleTheme, required this.onLogout});
+
+  final VoidCallback onToggleTheme;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final searchBackground = Theme.of(context).brightness == Brightness.light
+        ? Color.alphaBlend(
+            scheme.onSurface.withOpacity(0.04),
+            scheme.surfaceContainerHighest,
+          )
+        : Color.alphaBlend(
+            Colors.white.withOpacity(0.06),
+            scheme.surfaceContainerHighest,
+          );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.center,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: searchBackground,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SearchBar(
+                      leading: const Icon(Icons.search),
+                      hintText: 'Tim kiem lop hoc, hoc sinh, bai tap...',
+                      elevation: const WidgetStatePropertyAll(0),
+                      backgroundColor: const WidgetStatePropertyAll(
+                        Colors.transparent,
+                      ),
+                      shape: WidgetStatePropertyAll(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: PopupMenuButton<_HeaderMenuAction>(
+                tooltip: 'Tuy chon tai khoan',
+                onSelected: (action) {
+                  if (action == _HeaderMenuAction.toggleTheme) {
+                    onToggleTheme();
+                    return;
+                  }
+                  onLogout();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem<_HeaderMenuAction>(
+                    value: _HeaderMenuAction.toggleTheme,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.brightness_6_outlined),
+                      title: Text('Chuyen giao dien'),
+                    ),
+                  ),
+                  PopupMenuItem<_HeaderMenuAction>(
+                    value: _HeaderMenuAction.logout,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.logout_outlined),
+                      title: Text('Dang xuat'),
+                    ),
+                  ),
+                ],
+                child: const CircleAvatar(
+                  radius: 20,
+                  child: Icon(Icons.person_outline),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+}
+
+class _CenterTextScreen extends StatelessWidget {
+  const _CenterTextScreen({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(
+          context,
+        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+enum _HeaderMenuAction { toggleTheme, logout }
