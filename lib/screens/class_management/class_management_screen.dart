@@ -26,7 +26,7 @@ class ClassManagementScreen extends StatelessWidget {
         Row(
           children: [
             Text(
-              'Lop hoc cua toi',
+              'My Classes',
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -40,7 +40,7 @@ class ClassManagementScreen extends StatelessWidget {
               ),
               onPressed: () {},
               icon: Icon(isTeacher ? Icons.add : Icons.login),
-              label: Text(isTeacher ? 'Tao lop hoc moi' : 'Tham gia lop hoc'),
+              label: Text(isTeacher ? 'Create New Class' : 'Join Class'),
             ),
           ],
         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_rtc/screens/meeting/meeting_screen.dart';
 import 'package:flutter_web_rtc/widgets/post_card.dart';
+import 'package:flutter_web_rtc/widgets/message_composer.dart';
 
 class TeamsChannelScreen extends StatefulWidget {
   const TeamsChannelScreen({
@@ -17,13 +19,28 @@ class TeamsChannelScreen extends StatefulWidget {
 
 class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
   late final List<String> _teams;
+  late final List<PostCardData> _posts;
+  final ScrollController _postsScrollController = ScrollController();
   late String _selectedTeam;
+  bool _isComposerVisible = false;
+  bool _showNewPostIndicator = false;
+  int? _editingPostIndex;
+  String _composerInitialSubject = '';
+  String _composerInitialBody = '';
+  List<dynamic>? _composerInitialBodyDelta;
 
   @override
   void initState() {
     super.initState();
     _teams = _buildTeams(widget.initialTeam, widget.availableTeams);
+    _posts = List<PostCardData>.of(PostCardSamples.posts, growable: true);
     _selectedTeam = widget.initialTeam;
+  }
+
+  @override
+  void dispose() {
+    _postsScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -43,52 +60,83 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                 color: Theme.of(context).colorScheme.outlineVariant,
               ),
               Expanded(
-                child: Stack(
-                  children: [
-                    LayoutBuilder(
-                      builder: (context, feedConstraints) {
-                        final horizontalInset = (feedConstraints.maxWidth / 10)
-                            .clamp(16.0, 140.0);
+                child: LayoutBuilder(
+                  builder: (context, feedConstraints) {
+                    final horizontalInset = (feedConstraints.maxWidth / 10)
+                        .clamp(16.0, 140.0);
 
-                        return ListView(
+                    return Stack(
+                      children: [
+                        Padding(
                           padding: EdgeInsets.only(
                             left: horizontalInset,
                             right: horizontalInset,
                             top: 16,
-                            bottom: 88,
+                            bottom: 16,
                           ),
-                          children: PostCardSamples.posts
-                              .map((post) => PostCard(post: post))
-                              .toList(),
-                        );
-                      },
-                    ),
-                    Positioned(
-                      left: 24,
-                      bottom: 24,
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.edit_square, size: 18),
-                        label: const Text(
-                          'Post in channel',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: ListView(
+                                  controller: _postsScrollController,
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  children: _posts
+                                      .map(
+                                        (post) => PostCard(
+                                          post: post,
+                                          onModifyPost: _handleModifyPost,
+                                          onDeletePost: _handleDeletePost,
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ),
+                              if (_isComposerVisible)
+                                MessageComposer(
+                                  userName: 'Do Manh Cuong 20225172',
+                                  userInitials: 'DC',
+                                  initialSubject: _composerInitialSubject,
+                                  initialBody: _composerInitialBody,
+                                  initialBodyDelta: _composerInitialBodyDelta,
+                                  postButtonLabel: _editingPostIndex == null
+                                      ? 'Post'
+                                      : 'Update',
+                                  onClose: _closeComposer,
+                                  onPost: _handlePost,
+                                )
+                              else
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: FilledButton.icon(
+                                    onPressed: _openComposerForNewPost,
+                                    icon: const Icon(
+                                      Icons.edit_sharp,
+                                      size: 18,
+                                    ),
+                                    label: const Text(
+                                      'Post in channel',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
+                        if (_showNewPostIndicator)
+                          Positioned(
+                            right: 20,
+                            bottom: 20,
+                            child: FilledButton.icon(
+                              onPressed: _scrollToLatestPost,
+                              icon: const Icon(Icons.keyboard_arrow_down),
+                              label: const Text('Have a new post in channel'),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -96,6 +144,124 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
         },
       ),
     );
+  }
+
+  void _handlePost(String subject, String bodyPlain, List<dynamic> bodyDelta) {
+    if (subject.isEmpty && bodyPlain.isEmpty) {
+      return;
+    }
+
+    final postTitle = subject.isEmpty ? '(No subject)' : subject;
+    final content = bodyPlain.isEmpty ? ' ' : bodyPlain;
+
+    setState(() {
+      if (_editingPostIndex != null && _editingPostIndex! < _posts.length) {
+        final oldPost = _posts[_editingPostIndex!];
+        _posts[_editingPostIndex!] = PostCardData(
+          authorName: oldPost.authorName,
+          authorInitials: oldPost.authorInitials,
+          postedAt: oldPost.postedAt,
+          title: postTitle,
+          content: content,
+          bodyDelta: bodyDelta,
+          linkSummary: oldPost.linkSummary,
+          linkDomain: oldPost.linkDomain,
+          replyInitials: oldPost.replyInitials,
+        );
+      } else {
+        _posts.insert(
+          _posts.length,
+          PostCardData(
+            authorName: 'Do Manh Cuong 20225172',
+            authorInitials: 'DC',
+            postedAt: 'Now',
+            title: postTitle,
+            content: content,
+            bodyDelta: bodyDelta,
+            linkSummary: '',
+            linkDomain: '',
+            replyInitials: 'DC',
+          ),
+        );
+        _showNewPostIndicator = true;
+      }
+      _isComposerVisible = false;
+      _editingPostIndex = null;
+      _composerInitialSubject = '';
+      _composerInitialBody = '';
+      _composerInitialBodyDelta = null;
+    });
+  }
+
+  void _handleModifyPost(PostCardData post) {
+    final index = _posts.indexOf(post);
+    if (index == -1) {
+      return;
+    }
+    setState(() {
+      _editingPostIndex = index;
+      _composerInitialSubject = post.title == '(No subject)' ? '' : post.title;
+      _composerInitialBody = post.content.trim();
+      _composerInitialBodyDelta = post.bodyDelta;
+      _isComposerVisible = true;
+      _showNewPostIndicator = false;
+    });
+  }
+
+  void _handleDeletePost(PostCardData post) {
+    final index = _posts.indexOf(post);
+    if (index == -1) {
+      return;
+    }
+    setState(() {
+      _posts.removeAt(index);
+      if (_editingPostIndex == index) {
+        _isComposerVisible = false;
+        _editingPostIndex = null;
+        _composerInitialSubject = '';
+        _composerInitialBody = '';
+        _composerInitialBodyDelta = null;
+      }
+      if (_editingPostIndex != null && index < _editingPostIndex!) {
+        _editingPostIndex = _editingPostIndex! - 1;
+      }
+    });
+  }
+
+  void _openComposerForNewPost() {
+    setState(() {
+      _editingPostIndex = null;
+      _composerInitialSubject = '';
+      _composerInitialBody = '';
+      _composerInitialBodyDelta = null;
+      _isComposerVisible = true;
+    });
+  }
+
+  void _closeComposer() {
+    setState(() {
+      _isComposerVisible = false;
+      _editingPostIndex = null;
+      _composerInitialSubject = '';
+      _composerInitialBody = '';
+      _composerInitialBodyDelta = null;
+    });
+  }
+
+  void _scrollToLatestPost() {
+    if (!_postsScrollController.hasClients) {
+      return;
+    }
+
+    _postsScrollController.animateTo(
+      _postsScrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+    );
+
+    setState(() {
+      _showNewPostIndicator = false;
+    });
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
@@ -120,7 +286,9 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
       ),
       actions: [
         OutlinedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MeetingScreen()));
+          },
           icon: const Icon(Icons.videocam_outlined, size: 20),
           label: const Text('Meet now'),
           style: OutlinedButton.styleFrom(

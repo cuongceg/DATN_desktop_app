@@ -68,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody() {
     switch (_selectedNav) {
       case 0:
-        return const _CenterTextScreen(text: 'Thong bao');
+        return const _CenterTextScreen(text: 'Notifications');
       case 1:
         return ClassManagementScreen(
           isTeacher: widget.isTeacher,
@@ -77,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return const CalendarDesktopScreen();
       case 3:
-        return const _CenterTextScreen(text: 'Cai dat');
+        return const _CenterTextScreen(text: 'Settings');
       default:
         return const SizedBox.shrink();
     }
@@ -119,7 +119,7 @@ class _HeaderArea extends StatelessWidget {
                     ),
                     child: SearchBar(
                       leading: const Icon(Icons.search),
-                      hintText: 'Tim kiem lop hoc, hoc sinh, bai tap...',
+                      hintText: 'Search classes, students, assignments...',
                       elevation: const WidgetStatePropertyAll(0),
                       backgroundColor: const WidgetStatePropertyAll(
                         Colors.transparent,
@@ -137,7 +137,7 @@ class _HeaderArea extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: PopupMenuButton<_HeaderMenuAction>(
-                tooltip: 'Tuy chon tai khoan',
+                tooltip: 'Account Options',
                 onSelected: (action) {
                   if (action == _HeaderMenuAction.toggleTheme) {
                     onToggleTheme();
@@ -151,7 +151,7 @@ class _HeaderArea extends StatelessWidget {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.brightness_6_outlined),
-                      title: Text('Chuyen giao dien'),
+                      title: Text('Toggle Theme'),
                     ),
                   ),
                   PopupMenuItem<_HeaderMenuAction>(
@@ -159,7 +159,7 @@ class _HeaderArea extends StatelessWidget {
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.logout_outlined),
-                      title: Text('Dang xuat'),
+                      title: Text('Logout'),
                     ),
                   ),
                 ],

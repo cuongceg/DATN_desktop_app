@@ -168,14 +168,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 48,
                 child: OutlinedButton(
                   onPressed: () {
-                    // TODO: Thêm logic chuyển sang màn hình tham gia cuộc họp bằng mã
                   },
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white, // Nền trắng theo yêu cầu
+                    backgroundColor: Theme.of(context).colorScheme.surface, // Nền trắng theo yêu cầu
                     foregroundColor:
-                        colorScheme.primary, // Chữ cùng màu với viền
+                        Theme.of(context).colorScheme.primary, // Chữ cùng màu với viền
                     side: BorderSide(
-                      color: colorScheme.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       width: 1.5,
                     ), // Viền cùng màu nút Đăng nhập
                   ),
