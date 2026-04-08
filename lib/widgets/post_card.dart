@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_reaction_button/flutter_reaction_button.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_web_rtc/widgets/app_react_button.dart';
+
+enum PostMenuAction { modify, delete }
 
 class PostCard extends StatelessWidget {
-  const PostCard({super.key, required this.post});
+  const PostCard({
+    super.key,
+    required this.post,
+    required this.onDeletePost,
+    required this.onModifyPost,
+  });
 
   final PostCardData post;
+  final void Function(PostCardData post) onDeletePost;
+  final void Function(PostCardData post) onModifyPost;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +83,6 @@ class PostCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
 
-                      // Tiêu đề bài viết
                       Text(
                         post.title,
                         style: TextStyle(
@@ -83,61 +92,57 @@ class PostCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
 
-                      Text(
-                        post.content,
-                        style: TextStyle(
-                          color: colors.onSurface,
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
+                      _PostBodyView(post: post),
                       const SizedBox(height: 16),
 
                       // Link Preview Card
-                      LinkPreviewCard(post: post),
+                      if (post.linkSummary.isNotEmpty ||
+                          post.linkDomain.isNotEmpty)
+                        LinkPreviewCard(post: post),
                     ],
                   ),
                 ),
                 // Icon nhóm góc phải
-                Icon(
-                  Icons.people_alt_outlined,
-                  color: colors.onSurfaceVariant,
-                  size: 20,
-                ),
+                if (post.authorName == 'Do Manh Cuong 20225172')
+                  PopupMenuButton<PostMenuAction>(
+                    tooltip: 'Post actions',
+                    onSelected: (action) {
+                      switch (action) {
+                        case PostMenuAction.modify:
+                          onModifyPost(post);
+                        case PostMenuAction.delete:
+                          onDeletePost(post);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem<PostMenuAction>(
+                        value: PostMenuAction.modify,
+                        child: Text('Modify post'),
+                      ),
+                      PopupMenuItem<PostMenuAction>(
+                        value: PostMenuAction.delete,
+                        child: Text('Delete post'),
+                      ),
+                    ],
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: colors.onSurfaceVariant,
+                      size: 20,
+                    ),
+                  ),
               ],
             ),
           ),
 
           Padding(
             padding: const EdgeInsets.only(left: 58, bottom: 8),
-            child: ReactionButton<String>(
-              itemSize: const Size(44, 44), // Kích thước icon cảm xúc),
-              onReactionChanged: (Reaction<String>? reaction) {
-                if (reaction != null) {
-                  debugPrint('Người dùng vừa thả cảm xúc: ${reaction.value}');
-                  // TODO: Gọi API hoặc cập nhật State để hiển thị số lượng reaction
-                }
-              },
-              reactions: myReactions,
-              // Icon mặc định hiển thị khi chưa có cảm xúc nào được chọn
-              placeholder: Reaction<String>(
-                value: 'none',
-                icon: Icon(
-                  Icons.add_reaction_outlined,
-                  size: 20,
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-              // Cấu hình UI cho hộp chứa cảm xúc (Pop-up box)
-              boxColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHigh, // Nền hộp trùng với theme
-              boxRadius: 30, // Bo góc tròn trịa
-              boxElevation: 4, // Đổ bóng nhẹ tạo chiều sâu
-              boxPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
-              ),
+            child: AppReactButton(
+              tooltip: 'React to post',
+              icon: Icons.add_reaction_outlined,
+              iconColor: colors.onSurfaceVariant,
+              itemSize: const Size(44, 44),
+              boxColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+              onReactionChanged: (_) {},
             ),
           ),
 
@@ -186,6 +191,7 @@ class PostCardData {
     required this.postedAt,
     required this.title,
     required this.content,
+    this.bodyDelta,
     required this.linkSummary,
     required this.linkDomain,
     required this.replyInitials,
@@ -196,9 +202,84 @@ class PostCardData {
   final String postedAt;
   final String title;
   final String content;
+  final List<dynamic>? bodyDelta;
   final String linkSummary;
   final String linkDomain;
   final String replyInitials;
+}
+
+class _PostBodyView extends StatefulWidget {
+  const _PostBodyView({required this.post});
+
+  final PostCardData post;
+
+  @override
+  State<_PostBodyView> createState() => _PostBodyViewState();
+}
+
+class _PostBodyViewState extends State<_PostBodyView> {
+  late QuillController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = _buildController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PostBodyView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post != widget.post) {
+      _controller.dispose();
+      _controller = _buildController();
+    }
+  }
+
+  QuillController _buildController() {
+    final delta = widget.post.bodyDelta;
+    final document = (delta != null && delta.isNotEmpty)
+        ? Document.fromJson(delta)
+        : (Document()..insert(0, widget.post.content));
+    return QuillController(
+      document: document,
+      selection: const TextSelection.collapsed(offset: 0),
+      readOnly: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return QuillEditor.basic(
+      controller: _controller,
+      config: QuillEditorConfig(
+        scrollable: false,
+        expands: false,
+        showCursor: false,
+        padding: EdgeInsets.zero,
+        customStyles: DefaultStyles(
+          paragraph: DefaultTextBlockStyle(
+            Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurface,
+                  height: 1.5,
+                ) ??
+                TextStyle(color: colors.onSurface, height: 1.5),
+            const HorizontalSpacing(0, 0),
+            const VerticalSpacing(0, 0),
+            const VerticalSpacing(0, 0),
+            null,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class PostCardSamples {
@@ -213,7 +294,7 @@ class PostCardSamples {
       linkSummary:
           'Seminar AI trong giáo dục sẽ chia sẻ case study thực tế và demo hệ thống trợ giảng thông minh cho lớp học đại học.',
       linkDomain: 'ctsv.soict.hust.edu.vn',
-      replyInitials: 'D2',
+      replyInitials: 'DC',
     ),
     PostCardData(
       authorName: 'Lê Hải Đăng',
@@ -225,7 +306,7 @@ class PostCardSamples {
       linkSummary:
           'Hackathon Smart Campus 2026 tập trung các bài toán quản lý đào tạo, tối ưu năng lượng và trải nghiệm học tập số.',
       linkDomain: 'hackathon.hust.edu.vn',
-      replyInitials: 'N7',
+      replyInitials: 'DC',
     ),
     PostCardData(
       authorName: 'Phạm Thu Hà',
@@ -237,7 +318,7 @@ class PostCardSamples {
       linkSummary:
           'Kế hoạch bảo trì LMS tháng 4/2026: nâng cấp cơ sở dữ liệu, tối ưu tốc độ truy cập và tăng độ ổn định hệ thống.',
       linkDomain: 'lms.hust.edu.vn',
-      replyInitials: 'K3',
+      replyInitials: 'DC',
     ),
     PostCardData(
       authorName: 'Đoàn Thanh niên SOICT',
@@ -249,12 +330,11 @@ class PostCardSamples {
       linkSummary:
           'Ngày hội việc làm 2026 quy tụ hơn 80 doanh nghiệp công nghệ và hàng nghìn vị trí thực tập, tuyển dụng cho sinh viên.',
       linkDomain: 'youth.soict.hust.edu.vn',
-      replyInitials: 'A1',
+      replyInitials: 'DC',
     ),
   ];
 }
 
-// Widget giả lập thẻ xem trước link (Link Preview)
 class LinkPreviewCard extends StatelessWidget {
   const LinkPreviewCard({super.key, required this.post});
 
@@ -336,63 +416,3 @@ class LinkPreviewCard extends StatelessWidget {
     );
   }
 }
-
-final List<Reaction<String>> myReactions = [
-  Reaction<String>(
-    value: 'like',
-    icon: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6.0),
-      child: Text('👍', style: TextStyle(fontSize: 24)),
-    ),
-  ),
-  Reaction<String>(
-    value: 'love',
-    icon: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6.0),
-      child: Text(
-        '❤️',
-        style: TextStyle(fontSize: 24, fontFamily: 'Segoe UI Emoji'),
-      ),
-    ),
-  ),
-  Reaction<String>(
-    value: 'laugh',
-    icon: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6.0),
-      child: Text(
-        '😆',
-        style: TextStyle(fontSize: 24, fontFamily: 'Segoe UI Emoji'),
-      ),
-    ),
-  ),
-  Reaction<String>(
-    value: 'wow',
-    icon: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6.0),
-      child: Text(
-        '😮',
-        style: TextStyle(fontSize: 24, fontFamily: 'Segoe UI Emoji'),
-      ),
-    ),
-  ),
-  Reaction<String>(
-    value: 'sad',
-    icon: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6.0),
-      child: Text(
-        '😢',
-        style: TextStyle(fontSize: 24, fontFamily: 'Segoe UI Emoji'),
-      ),
-    ),
-  ),
-  Reaction<String>(
-    value: 'angry',
-    icon: const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 6.0),
-      child: Text(
-        '😡',
-        style: TextStyle(fontSize: 24, fontFamily: 'Segoe UI Emoji'),
-      ),
-    ),
-  ),
-];
