@@ -26,9 +26,20 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedNav = 1;
 
+  void _handleThemeModeChange(ThemeMode desiredMode) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if ((desiredMode == ThemeMode.dark && !isDark) ||
+        (desiredMode == ThemeMode.light && isDark)) {
+      widget.onToggleTheme();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final currentThemeMode = Theme.of(context).brightness == Brightness.dark
+        ? ThemeMode.dark
+        : ThemeMode.light;
 
     return Scaffold(
       body: SafeArea(
@@ -54,7 +65,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       onLogout: widget.onLogout,
                     ),
                     const SizedBox(height: 20),
-                    Expanded(child: _buildBody()),
+                    Expanded(
+                      child: _buildBody(currentThemeMode: currentThemeMode),
+                    ),
                   ],
                 ),
               ),
@@ -65,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({required ThemeMode currentThemeMode}) {
     switch (_selectedNav) {
       case 0:
         return const _CenterTextScreen(text: 'Notifications');
@@ -73,6 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return ClassManagementScreen(
           isTeacher: widget.isTeacher,
           classrooms: widget.classrooms,
+          currentThemeMode: currentThemeMode,
+          onThemeToggle: _handleThemeModeChange,
         );
       case 2:
         return const CalendarDesktopScreen();
@@ -95,11 +110,11 @@ class _HeaderArea extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final searchBackground = Theme.of(context).brightness == Brightness.light
         ? Color.alphaBlend(
-            scheme.onSurface.withOpacity(0.04),
+            scheme.onSurface.withValues(alpha: 0.04),
             scheme.surfaceContainerHighest,
           )
         : Color.alphaBlend(
-            Colors.white.withOpacity(0.06),
+            Colors.white.withValues(alpha: 0.06),
             scheme.surfaceContainerHighest,
           );
 

@@ -8,10 +8,14 @@ class ClassCardStudent extends StatelessWidget {
     super.key,
     required this.classroom,
     required this.availableTeams,
+    required this.currentThemeMode,
+    required this.onThemeToggle,
   });
 
   final Classroom classroom;
   final List<String> availableTeams;
+  final ThemeMode currentThemeMode;
+  final ValueChanged<ThemeMode> onThemeToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +35,9 @@ class ClassCardStudent extends StatelessWidget {
             builder: (_) => TeamsChannelScreen(
               initialTeam: classroom.name,
               availableTeams: availableTeams,
+              isTeacher: false,
+              currentThemeMode: currentThemeMode,
+              onThemeToggle: onThemeToggle,
             ),
           ),
         );
@@ -41,7 +48,9 @@ class ClassCardStudent extends StatelessWidget {
         color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: scheme.outlineVariant.withOpacity(0.35)),
+          side: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.35),
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: LayoutBuilder(

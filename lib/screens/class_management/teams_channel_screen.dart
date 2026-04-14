@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_rtc/screens/class_management/document_management_screen.dart';
 import 'package:flutter_web_rtc/screens/meeting/meeting_screen.dart';
 import 'package:flutter_web_rtc/widgets/post_card.dart';
 import 'package:flutter_web_rtc/widgets/message_composer.dart';
@@ -7,11 +8,17 @@ class TeamsChannelScreen extends StatefulWidget {
   const TeamsChannelScreen({
     super.key,
     required this.initialTeam,
+    required this.isTeacher,
+    required this.currentThemeMode,
+    required this.onThemeToggle,
     this.availableTeams = const <String>[],
   });
 
+  final bool isTeacher;
   final String initialTeam;
   final List<String> availableTeams;
+  final ThemeMode currentThemeMode;
+  final ValueChanged<ThemeMode> onThemeToggle;
 
   @override
   State<TeamsChannelScreen> createState() => _TeamsChannelScreenState();
@@ -45,104 +52,121 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(context),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final sidebarWidth = (constraints.maxWidth * 0.2).clamp(220.0, 360.0);
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: _buildAppBar(context),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final sidebarWidth = (constraints.maxWidth * 0.2).clamp(
+              220.0,
+              360.0,
+            );
 
-          return Row(
+            return Row(
+              children: [
+                SizedBox(
+                  width: sidebarWidth,
+                  child: _buildTeamsSidebar(context),
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, feedConstraints) {
+                      final horizontalInset = (feedConstraints.maxWidth / 10)
+                          .clamp(16.0, 140.0);
+
+                      return TabBarView(
+                        children: [
+                          _buildPostsPane(horizontalInset),
+                          DocumentManagementScreen(
+                            currentThemeMode: widget.currentThemeMode,
+                            onThemeToggle: widget.onThemeToggle,
+                            embedded: true,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostsPane(double horizontalInset) {
+    return Stack(
+      children: [
+        Padding(
+          padding: EdgeInsets.only(
+            left: horizontalInset,
+            right: horizontalInset,
+            top: 16,
+            bottom: 16,
+          ),
+          child: Column(
             children: [
-              SizedBox(width: sidebarWidth, child: _buildTeamsSidebar(context)),
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, feedConstraints) {
-                    final horizontalInset = (feedConstraints.maxWidth / 10)
-                        .clamp(16.0, 140.0);
-
-                    return Stack(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: horizontalInset,
-                            right: horizontalInset,
-                            top: 16,
-                            bottom: 16,
-                          ),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: ListView(
-                                  controller: _postsScrollController,
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  children: _posts
-                                      .map(
-                                        (post) => PostCard(
-                                          post: post,
-                                          onModifyPost: _handleModifyPost,
-                                          onDeletePost: _handleDeletePost,
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
-                              ),
-                              if (_isComposerVisible)
-                                MessageComposer(
-                                  userName: 'Do Manh Cuong 20225172',
-                                  userInitials: 'DC',
-                                  initialSubject: _composerInitialSubject,
-                                  initialBody: _composerInitialBody,
-                                  initialBodyDelta: _composerInitialBodyDelta,
-                                  postButtonLabel: _editingPostIndex == null
-                                      ? 'Post'
-                                      : 'Update',
-                                  onClose: _closeComposer,
-                                  onPost: _handlePost,
-                                )
-                              else
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FilledButton.icon(
-                                    onPressed: _openComposerForNewPost,
-                                    icon: const Icon(
-                                      Icons.edit_sharp,
-                                      size: 18,
-                                    ),
-                                    label: const Text(
-                                      'Post in channel',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                child: ListView(
+                  controller: _postsScrollController,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  children: _posts
+                      .map(
+                        (post) => PostCard(
+                          post: post,
+                          onModifyPost: _handleModifyPost,
+                          onDeletePost: _handleDeletePost,
                         ),
-                        if (_showNewPostIndicator)
-                          Positioned(
-                            right: 20,
-                            bottom: 20,
-                            child: FilledButton.icon(
-                              onPressed: _scrollToLatestPost,
-                              icon: const Icon(Icons.keyboard_arrow_down),
-                              label: const Text('Have a new post in channel'),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
+                      )
+                      .toList(),
                 ),
               ),
+              if (_isComposerVisible)
+                MessageComposer(
+                  userName: 'Do Manh Cuong 20225172',
+                  userInitials: 'DC',
+                  initialSubject: _composerInitialSubject,
+                  initialBody: _composerInitialBody,
+                  initialBodyDelta: _composerInitialBodyDelta,
+                  postButtonLabel: _editingPostIndex == null
+                      ? 'Post'
+                      : 'Update',
+                  onClose: _closeComposer,
+                  onPost: _handlePost,
+                )
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: _openComposerForNewPost,
+                    icon: const Icon(Icons.edit_sharp, size: 18),
+                    label: const Text(
+                      'Post in channel',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
             ],
-          );
-        },
-      ),
+          ),
+        ),
+        if (_showNewPostIndicator)
+          Positioned(
+            right: 20,
+            bottom: 20,
+            child: FilledButton.icon(
+              onPressed: _scrollToLatestPost,
+              icon: const Icon(Icons.keyboard_arrow_down),
+              label: const Text('Have a new post in channel'),
+            ),
+          ),
+      ],
     );
   }
 
@@ -278,16 +302,18 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
             _selectedTeam,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
-          const SizedBox(width: 24),
-          _buildTab(context, 'Posts', isSelected: true),
           const SizedBox(width: 16),
-          _buildTab(context, 'Shared'),
+          _buildChannelTabs(context),
         ],
       ),
       actions: [
         OutlinedButton.icon(
           onPressed: () {
-            Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MeetingScreen()));
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MeetingScreen(isTeacher: widget.isTeacher),
+              ),
+            );
           },
           icon: const Icon(Icons.videocam_outlined, size: 20),
           label: const Text('Meet now'),
@@ -313,32 +339,40 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
     );
   }
 
-  Widget _buildTab(
-    BuildContext context,
-    String title, {
-    bool isSelected = false,
-  }) {
+  Widget _buildChannelTabs(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? colors.onSurface : colors.onSurfaceVariant,
-          ),
+    return SizedBox(
+      height: 40,
+      child: TabBar(
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        padding: EdgeInsets.zero,
+        dividerColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicatorPadding: const EdgeInsets.only(bottom: 2),
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(color: colors.primary, width: 3),
+          insets: const EdgeInsets.symmetric(horizontal: 10),
         ),
-        if (isSelected)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            height: 2,
-            width: 30,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-      ],
+        labelColor: colors.onSurface,
+        unselectedLabelColor: colors.onSurfaceVariant,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+        labelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          height: 1.2,
+        ),
+        tabs: const [
+          Tab(text: 'Posts'),
+          Tab(text: 'Shared'),
+        ],
+      ),
     );
   }
 
@@ -372,7 +406,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               itemCount: _teams.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 4),
+              separatorBuilder: (context, index) => const SizedBox(height: 4),
               itemBuilder: (context, index) {
                 final team = _teams[index];
                 final isSelected = team == _selectedTeam;
@@ -409,7 +443,9 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  selectedTileColor: colors.primaryContainer.withOpacity(0.45),
+                  selectedTileColor: colors.primaryContainer.withValues(
+                    alpha: 0.45,
+                  ),
                   onTap: () {
                     setState(() {
                       _selectedTeam = team;

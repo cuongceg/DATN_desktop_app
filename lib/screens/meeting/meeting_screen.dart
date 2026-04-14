@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_rtc/screens/meeting/chat_sidebar.dart';
-import 'package:flutter_web_rtc/widgets/app_react_button.dart';
 
 enum SidebarType { none, people, chat }
 
+enum MeetingReaction { none, handRaised, understood, needHelp }
+
 class MeetingScreen extends StatefulWidget {
-  const MeetingScreen({super.key});
+  const MeetingScreen({super.key, required this.isTeacher});
+  final bool isTeacher;
 
   @override
   State<MeetingScreen> createState() => _MeetingScreenState();
@@ -18,7 +20,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
   bool _isMicOn = true;
   bool _isCameraOn = true;
   bool _isSharingScreen = false;
-  bool _isHandRaised = false;
+  bool _isEnglishSubtitleOn = false;
+  MeetingReaction _myReaction = MeetingReaction.none;
 
   // Dữ liệu giả (Mock Data)
   final List<Map<String, dynamic>> mockParticipants = [
@@ -92,6 +95,236 @@ class _MeetingScreenState extends State<MeetingScreen> {
         _currentSidebar = type;
       }
     });
+  }
+
+  void _toggleMyReaction(MeetingReaction reaction) {
+    setState(() {
+      _myReaction = _myReaction == reaction ? MeetingReaction.none : reaction;
+    });
+  }
+
+  IconData? _reactionIcon(MeetingReaction reaction) {
+    switch (reaction) {
+      case MeetingReaction.handRaised:
+        return Icons.back_hand;
+      case MeetingReaction.understood:
+        return Icons.check_circle;
+      case MeetingReaction.needHelp:
+        return Icons.help;
+      case MeetingReaction.none:
+        return null;
+    }
+  }
+
+  Color _reactionColor(MeetingReaction reaction) {
+    switch (reaction) {
+      case MeetingReaction.handRaised:
+        return Colors.amber;
+      case MeetingReaction.understood:
+        return Colors.green;
+      case MeetingReaction.needHelp:
+        return Colors.redAccent;
+      case MeetingReaction.none:
+        return Colors.transparent;
+    }
+  }
+
+  Widget _buildControlGroup(List<Widget> children) {
+    return Row(mainAxisSize: MainAxisSize.min, children: children);
+  }
+
+  Widget _buildControlDivider(ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      width: 1,
+      height: 24,
+      color: theme.dividerColor.withOpacity(0.35),
+    );
+  }
+
+  Widget _buildSubtitleMenuButton(ThemeData theme) {
+    return PopupMenuButton<String>(
+      tooltip: 'Subtitle settings',
+      onSelected: (value) {
+        setState(() {
+          if (value == 'subtitle_on') {
+            _isEnglishSubtitleOn = true;
+          } else if (value == 'subtitle_off') {
+            _isEnglishSubtitleOn = false;
+          }
+        });
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          value: 'subtitle_on',
+          child: Row(
+            children: [
+              const Icon(Icons.subtitles, size: 18),
+              const SizedBox(width: 8),
+              Text('English subtitles on', style: theme.textTheme.bodyMedium),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'subtitle_off',
+          child: Row(
+            children: [
+              const Icon(Icons.subtitles_off, size: 18),
+              const SizedBox(width: 8),
+              Text('English subtitles off', style: theme.textTheme.bodyMedium),
+            ],
+          ),
+        ),
+      ],
+      child: ControlIconButton(
+        icon: Icons.more_horiz,
+        label: 'More',
+        onPressed: () {},
+        isActive: _isEnglishSubtitleOn,
+      ),
+    );
+  }
+
+  List<Widget> _buildTeacherControls(ThemeData theme) {
+    final firstGroup = _buildControlGroup([
+      ControlIconButton(
+        icon: Icons.people_alt_outlined,
+        label: 'People',
+        onPressed: () => _toggleSidebar(SidebarType.people),
+      ),
+      ControlIconButton(
+        icon: Icons.chat_bubble_outline,
+        label: 'Chat',
+        onPressed: () => _toggleSidebar(SidebarType.chat),
+      ),
+    ]);
+
+    final secondGroup = _buildControlGroup([
+      ControlIconButton(
+        icon: _isMicOn ? Icons.mic_none : Icons.mic_off,
+        label: 'Mic',
+        onPressed: () => setState(() => _isMicOn = !_isMicOn),
+      ),
+      ControlIconButton(
+        icon: _isCameraOn ? Icons.videocam : Icons.videocam_off,
+        label: 'Camera',
+        onPressed: () => setState(() => _isCameraOn = !_isCameraOn),
+        color: _isCameraOn ? Colors.blue : Colors.red,
+      ),
+      ControlIconButton(
+        icon: _isSharingScreen
+            ? Icons.stop_screen_share_outlined
+            : Icons.screen_share_outlined,
+        label: 'Share',
+        onPressed: () => setState(() => _isSharingScreen = !_isSharingScreen),
+      ),
+      const SizedBox(width: 8),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.red.shade700,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+        icon: const Icon(Icons.call_end, size: 18),
+        label: const Text('Leave'),
+      ),
+    ]);
+
+    return [firstGroup, _buildControlDivider(theme), secondGroup];
+  }
+
+  List<Widget> _buildStudentControls(ThemeData theme) {
+    final firstGroup = _buildControlGroup([
+      ControlIconButton(
+        icon: Icons.people_alt_outlined,
+        label: 'People',
+        onPressed: () => _toggleSidebar(SidebarType.people),
+      ),
+      ControlIconButton(
+        icon: Icons.chat_bubble_outline,
+        label: 'Chat',
+        onPressed: () => _toggleSidebar(SidebarType.chat),
+      ),
+      _buildSubtitleMenuButton(theme),
+    ]);
+
+    final secondGroup = _buildControlGroup([
+      ControlIconButton(
+        icon: _myReaction == MeetingReaction.handRaised
+            ? Icons.back_hand
+            : Icons.back_hand_outlined,
+        label: 'Raise Hand',
+        onPressed: () => _toggleMyReaction(MeetingReaction.handRaised),
+        color: Colors.amber,
+        isActive: _myReaction == MeetingReaction.handRaised,
+      ),
+      ControlIconButton(
+        icon: Icons.slow_motion_video,
+        label: 'request slow',
+        onPressed: () {},
+        color: Colors.orange.shade700,
+      ),
+      ControlIconButton(
+        icon: Icons.replay_outlined,
+        label: 'request repeat',
+        onPressed: () {},
+        color: Colors.blue.shade700,
+      ),
+      ControlIconButton(
+        icon: Icons.check_circle_outline,
+        label: 'understood',
+        onPressed: () => _toggleMyReaction(MeetingReaction.understood),
+        color: Colors.green.shade700,
+        isActive: _myReaction == MeetingReaction.understood,
+      ),
+      ControlIconButton(
+        icon: Icons.help_outline,
+        label: 'not clear',
+        onPressed: () => _toggleMyReaction(MeetingReaction.needHelp),
+        color: Colors.red.shade700,
+        isActive: _myReaction == MeetingReaction.needHelp,
+      ),
+    ]);
+
+    final thirdGroup = _buildControlGroup([
+      ControlIconButton(
+        icon: _isCameraOn ? Icons.videocam : Icons.videocam_off,
+        label: 'Camera',
+        onPressed: () => setState(() => _isCameraOn = !_isCameraOn),
+        color: _isCameraOn ? Colors.blue : Colors.red,
+      ),
+      ControlIconButton(
+        icon: _isSharingScreen
+            ? Icons.stop_screen_share_outlined
+            : Icons.screen_share_outlined,
+        label: 'Share',
+        onPressed: () => setState(() => _isSharingScreen = !_isSharingScreen),
+      ),
+      const SizedBox(width: 8),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.red.shade700,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        onPressed: () {
+          Navigator.of(context).pop();
+        },
+        icon: const Icon(Icons.call_end, size: 18),
+        label: const Text('Leave'),
+      ),
+    ]);
+
+    return [
+      firstGroup,
+      _buildControlDivider(theme),
+      secondGroup,
+      _buildControlDivider(theme),
+      thirdGroup,
+    ];
   }
 
   @override
@@ -186,69 +419,11 @@ class _MeetingScreenState extends State<MeetingScreen> {
                   Text('00:22:06', style: theme.textTheme.labelMedium),
                 ],
               ),
-              // Phải: Các nút điều khiển
               Row(
                 children: [
-                  ControlIconButton(
-                    icon: Icons.people_alt_outlined,
-                    label: 'People',
-                    onPressed: () => _toggleSidebar(SidebarType.people),
-                  ),
-                  ControlIconButton(
-                    icon: Icons.chat_bubble_outline,
-                    label: 'Chat',
-                    onPressed: () => _toggleSidebar(SidebarType.chat),
-                  ),
-                  AppReactButton(
-                    tooltip: 'React',
-                    itemSize: Size(40, 40),
-                    onReactionChanged: (reaction) => print(reaction?.value), // Không cần xử lý phản ứng trong demo
-                  ),
-                  ControlIconButton(
-                    icon: _isHandRaised
-                        ? Icons.back_hand
-                        : Icons.back_hand_outlined,
-                    label: 'Raise Hand',
-                    onPressed: () =>
-                        setState(() => _isHandRaised = !_isHandRaised),
-                    color: _isHandRaised ? Colors.amber : null,
-                  ),
-                  const SizedBox(width: 8),
-                  ControlIconButton(
-                    icon: _isMicOn ? Icons.mic_none : Icons.mic_off,
-                    label: 'Mic',
-                    onPressed: () => setState(() => _isMicOn = !_isMicOn),
-                  ),
-                  ControlIconButton(
-                    icon: _isCameraOn
-                        ? Icons.videocam_outlined
-                        : Icons.videocam_off_outlined,
-                    label: 'Camera',
-                    onPressed: () => setState(() => _isCameraOn = !_isCameraOn),
-                  ),
-                  ControlIconButton(
-                    icon: _isSharingScreen
-                        ? Icons.stop_screen_share_outlined
-                        : Icons.screen_share_outlined,
-                    label: 'Share',
-                    onPressed: () =>
-                        setState(() => _isSharingScreen = !_isSharingScreen),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    icon: const Icon(Icons.call_end, size: 18),
-                    label: const Text('Leave'),
-                  ),
+                  ...widget.isTeacher
+                      ? _buildTeacherControls(theme)
+                      : _buildStudentControls(theme),
                 ],
               ),
             ],
@@ -259,6 +434,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 
   Widget _buildVideoGrid(ThemeData theme, bool isDark) {
+    final String currentUserName = mockParticipants.first['name'];
+
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: GridView.builder(
@@ -270,7 +447,15 @@ class _MeetingScreenState extends State<MeetingScreen> {
         ),
         itemCount: mockParticipants.length,
         itemBuilder: (context, index) {
-          return VideoBox(participant: mockParticipants[index], isDark: isDark);
+          final participant = mockParticipants[index];
+          final bool isCurrentUser = participant['name'] == currentUserName;
+
+          return VideoBox(
+            participant: participant,
+            isDark: isDark,
+            statusIcon: isCurrentUser ? _reactionIcon(_myReaction) : null,
+            statusColor: isCurrentUser ? _reactionColor(_myReaction) : null,
+          );
         },
       ),
     );
@@ -294,6 +479,8 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 
   Widget _buildPeopleSidebar(ThemeData theme, bool isDark) {
+    final String currentUserName = mockParticipants.first['name'];
+
     return Column(
       key: const ValueKey('people_sidebar'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,9 +559,14 @@ class _MeetingScreenState extends State<MeetingScreen> {
           child: ListView.builder(
             itemCount: mockParticipants.length,
             itemBuilder: (context, index) {
+              final participant = mockParticipants[index];
+              final bool isCurrentUser = participant['name'] == currentUserName;
+
               return ParticipantListTile(
-                participant: mockParticipants[index],
+                participant: participant,
                 isDark: isDark,
+                statusIcon: isCurrentUser ? _reactionIcon(_myReaction) : null,
+                statusColor: isCurrentUser ? _reactionColor(_myReaction) : null,
               );
             },
           ),
@@ -384,40 +576,20 @@ class _MeetingScreenState extends State<MeetingScreen> {
   }
 }
 
-/// Nút điều khiển chức năng ở thanh TopBar
-class ControlIconButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final Color? color;
-
-  const ControlIconButton({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      child: IconButton(
-        icon: Icon(icon, size: 20, color: color),
-        onPressed: onPressed,
-        splashRadius: 20,
-      ),
-    );
-  }
-}
-
 /// Khối Video hiển thị trong Grid chính (Mock bằng Avatar)
 class VideoBox extends StatelessWidget {
   final Map<String, dynamic> participant;
   final bool isDark;
+  final IconData? statusIcon;
+  final Color? statusColor;
 
-  const VideoBox({super.key, required this.participant, required this.isDark});
+  const VideoBox({
+    super.key,
+    required this.participant,
+    required this.isDark,
+    this.statusIcon,
+    this.statusColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -425,6 +597,12 @@ class VideoBox extends StatelessWidget {
     final String name = participant['name'];
     final bool isMuted = participant['isMuted'];
     final bool handRaised = participant['handRaised'] ?? false;
+    final IconData? displayedStatusIcon = handRaised && statusIcon == null
+        ? Icons.back_hand
+        : statusIcon;
+    final Color displayedStatusColor = handRaised && statusIcon == null
+        ? Colors.amber
+        : (statusColor ?? Colors.white);
 
     // Màu nền của ô video giả lập
     final boxColor = isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
@@ -451,8 +629,12 @@ class VideoBox extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (handRaised) ...[
-                    const Icon(Icons.back_hand, color: Colors.amber, size: 14),
+                  if (displayedStatusIcon != null) ...[
+                    Icon(
+                      displayedStatusIcon,
+                      color: displayedStatusColor,
+                      size: 14,
+                    ),
                     const SizedBox(width: 4),
                   ],
                   Text(
@@ -495,15 +677,76 @@ class VideoBox extends StatelessWidget {
   }
 }
 
+class ControlIconButton extends StatelessWidget {
+  final IconData icon;
+
+  final String label;
+
+  final VoidCallback onPressed;
+
+  final Color? color;
+  final bool isActive;
+
+  const ControlIconButton({
+    super.key,
+
+    required this.icon,
+
+    required this.label,
+
+    required this.onPressed,
+
+    this.color,
+    this.isActive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final Color baseColor = color ?? theme.colorScheme.onSurfaceVariant;
+    final Color iconColor = isActive
+        ? baseColor
+        : theme.colorScheme.onSurfaceVariant.withOpacity(0.7);
+
+    return Tooltip(
+      message: label,
+
+      child: Material(
+        color: isActive ? baseColor.withOpacity(0.18) : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: isActive
+                ? baseColor.withOpacity(0.55)
+                : theme.dividerColor.withOpacity(0.35),
+            width: 1,
+          ),
+        ),
+        child: IconButton(
+          icon: Icon(icon, size: 20, color: iconColor),
+
+          onPressed: onPressed,
+
+          splashRadius: 20,
+        ),
+      ),
+    );
+  }
+}
+
 /// Item danh sách người tham gia ở Right Sidebar
 class ParticipantListTile extends StatelessWidget {
   final Map<String, dynamic> participant;
   final bool isDark;
+  final IconData? statusIcon;
+  final Color? statusColor;
 
   const ParticipantListTile({
     super.key,
     required this.participant,
     required this.isDark,
+    this.statusIcon,
+    this.statusColor,
   });
 
   @override
@@ -513,6 +756,12 @@ class ParticipantListTile extends StatelessWidget {
     final bool isMuted = participant['isMuted'];
     final String? role = participant['role'];
     final bool handRaised = participant['handRaised'] ?? false;
+    final IconData? displayedStatusIcon = handRaised && statusIcon == null
+        ? Icons.back_hand
+        : statusIcon;
+    final Color displayedStatusColor = handRaised && statusIcon == null
+        ? Colors.amber
+        : (statusColor ?? theme.hintColor);
 
     String initials = name.isNotEmpty
         ? name.trim().split(' ').map((e) => e[0]).take(2).join().toUpperCase()
@@ -553,8 +802,8 @@ class ParticipantListTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (handRaised)
-            const Icon(Icons.back_hand, color: Colors.amber, size: 16),
+          if (displayedStatusIcon != null)
+            Icon(displayedStatusIcon, color: displayedStatusColor, size: 16),
           const SizedBox(width: 12),
           Icon(
             isMuted ? Icons.mic_off : Icons.mic,
