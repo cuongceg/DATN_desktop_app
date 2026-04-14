@@ -92,14 +92,14 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Đăng nhập hệ thống học tập',
+                'Sign in to the learning system',
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Vui lòng chọn vai trò và đăng nhập để tiếp tục.',
+                'Please choose your role and sign in to continue.',
                 style: textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
@@ -107,12 +107,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 segments: const [
                   ButtonSegment<UserRole>(
                     value: UserRole.teacher,
-                    label: Text('Giáo viên'),
+                    label: Text('Teacher'),
                     icon: Icon(Icons.co_present_outlined),
                   ),
                   ButtonSegment<UserRole>(
                     value: UserRole.student,
-                    label: Text('Học sinh'),
+                    label: Text('Student'),
                     icon: Icon(Icons.school_outlined),
                   ),
                 ],
@@ -136,47 +136,49 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Mật khẩu'),
+                decoration: const InputDecoration(labelText: 'Password'),
               ),
               const SizedBox(height: 20),
 
-              // Nút Đăng nhập chính
+              // Primary sign-in button
               SizedBox(
                 height: 48,
                 child: FilledButton(
                   onPressed: () => widget.onLogin(_selectedRole),
-                  child: const Text('Đăng nhập'),
+                  child: const Text('Sign in'),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Cụm chữ "Hoặc"
+              // "Or" separator
               Row(
                 children: [
                   const Expanded(child: Divider()),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('Hoặc', style: textTheme.bodySmall),
+                    child: Text('Or', style: textTheme.bodySmall),
                   ),
                   const Expanded(child: Divider()),
                 ],
               ),
               const SizedBox(height: 20),
 
-              // Nút Join a meeting mới
+              // Join meeting button
               SizedBox(
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: () {
-                  },
+                  onPressed: () {},
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.surface, // Nền trắng theo yêu cầu
-                    foregroundColor:
-                        Theme.of(context).colorScheme.primary, // Chữ cùng màu với viền
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surface, // White background as requested
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary, // Text color matches border
                     side: BorderSide(
                       color: Theme.of(context).colorScheme.primary,
                       width: 1.5,
-                    ), // Viền cùng màu nút Đăng nhập
+                    ), // Border color matches the sign-in button
                   ),
                   child: const Text(
                     'Join a meeting',
@@ -217,7 +219,7 @@ class _BrandPanel extends StatelessWidget {
             child: IconButton.filledTonal(
               onPressed: onToggleTheme,
               icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-              tooltip: 'Chuyển giao diện',
+              tooltip: 'Toggle theme',
             ),
           ),
           const Spacer(),
@@ -246,7 +248,7 @@ class _BrandPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Nền tảng học tập trực tuyến cho giáo viên và học sinh.',
+            'An online learning platform for teachers and students.',
             style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
           ),
           const Spacer(),
