@@ -9,10 +9,14 @@ class ClassManagementScreen extends StatelessWidget {
     super.key,
     required this.isTeacher,
     required this.classrooms,
+    required this.currentThemeMode,
+    required this.onThemeToggle,
   });
 
   final bool isTeacher;
   final List<Classroom> classrooms;
+  final ThemeMode currentThemeMode;
+  final ValueChanged<ThemeMode> onThemeToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -75,11 +79,15 @@ class ClassManagementScreen extends StatelessWidget {
                     return ClassCardTeacher(
                       classroom: classroom,
                       availableTeams: availableTeams,
+                      currentThemeMode: currentThemeMode,
+                      onThemeToggle: onThemeToggle,
                     );
                   }
                   return ClassCardStudent(
                     classroom: classroom,
                     availableTeams: availableTeams,
+                    currentThemeMode: currentThemeMode,
+                    onThemeToggle: onThemeToggle,
                   );
                 },
               );
