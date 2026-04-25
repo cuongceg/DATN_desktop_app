@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_rtc/screens/class_management/teams_channel_screen.dart';
 
-import '../models/classroom.dart';
+import '../models/class_model.dart';
 
 class ClassCardStudent extends StatelessWidget {
   const ClassCardStudent({
@@ -12,7 +12,7 @@ class ClassCardStudent extends StatelessWidget {
     required this.onThemeToggle,
   });
 
-  final Classroom classroom;
+  final ClassModel classroom;
   final List<String> availableTeams;
   final ThemeMode currentThemeMode;
   final ValueChanged<ThemeMode> onThemeToggle;
@@ -85,60 +85,19 @@ class ClassCardStudent extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          classroom.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                        child: SizedBox(
+                          height: logoHeight,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              classroom.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ),
                         ),
-                      ),
-                      PopupMenuButton<String>(
-                        tooltip: 'Tùy chọn lớp học',
-                        onSelected: (_) {},
-                        itemBuilder: (context) => const [
-                          PopupMenuItem<String>(
-                            value: 'hide',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.visibility_off_outlined),
-                              title: Text('Hide'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'add_member',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.person_add_alt_1_outlined),
-                              title: Text('Add member'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'manage_teams',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.groups_2_outlined),
-                              title: Text('Manage teams'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'manage_tags',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.sell_outlined),
-                              title: Text('Manage tags'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'copy_link',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.link_outlined),
-                              title: Text('Copy link'),
-                            ),
-                          ),
-                        ],
-                        icon: const Icon(Icons.more_horiz),
                       ),
                     ],
                   ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_rtc/screens/class_management/teams_channel_screen.dart';
 
-import '../models/classroom.dart';
+import '../models/class_model.dart';
 
 class ClassCardTeacher extends StatelessWidget {
   const ClassCardTeacher({
@@ -10,12 +10,16 @@ class ClassCardTeacher extends StatelessWidget {
     required this.availableTeams,
     required this.currentThemeMode,
     required this.onThemeToggle,
+    required this.onEdit,
+    required this.onDelete,
   });
 
-  final Classroom classroom;
+  final ClassModel classroom;
   final List<String> availableTeams;
   final ThemeMode currentThemeMode;
   final ValueChanged<ThemeMode> onThemeToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -100,51 +104,33 @@ class ClassCardTeacher extends StatelessWidget {
                         ),
                       ),
                       PopupMenuButton<String>(
-                        tooltip: 'Tùy chọn lớp học',
-                        onSelected: (_) {},
+                        tooltip: 'Class actions',
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            onEdit();
+                            return;
+                          }
+                          onDelete();
+                        },
                         itemBuilder: (context) => const [
                           PopupMenuItem<String>(
-                            value: 'hide',
+                            value: 'edit',
                             child: ListTile(
                               contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.visibility_off_outlined),
-                              title: Text('Hide'),
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Edit'),
                             ),
                           ),
                           PopupMenuItem<String>(
-                            value: 'add_member',
+                            value: 'delete',
                             child: ListTile(
                               contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.person_add_alt_1_outlined),
-                              title: Text('Add member'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'manage_teams',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.groups_2_outlined),
-                              title: Text('Manage teams'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'manage_tags',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.sell_outlined),
-                              title: Text('Manage tags'),
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            value: 'copy_link',
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.link_outlined),
-                              title: Text('Copy link'),
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Delete'),
                             ),
                           ),
                         ],
-                        icon: const Icon(Icons.more_horiz),
+                        icon: const Icon(Icons.more_vert),
                       ),
                     ],
                   ),

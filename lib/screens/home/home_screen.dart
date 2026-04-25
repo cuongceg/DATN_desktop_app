@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../models/classroom.dart';
+import '../../models/class_details.dart';
+import '../../models/class_member.dart';
+import '../../models/class_model.dart';
+import '../../models/class_notification.dart';
+import '../../models/user.dart';
 import '../calendar/calendar_screen.dart';
 import '../class_management/class_management_screen.dart';
 import '../../widgets/sidebar_navigation.dart';
@@ -10,12 +14,59 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.isTeacher,
     required this.classrooms,
+    required this.notifications,
+    required this.isLoadingClasses,
+    required this.onRefreshClasses,
+    required this.onCreateClass,
+    required this.onSearchUsers,
+    required this.onAddMembersToClass,
+    required this.onUpdateClass,
+    required this.onFetchClassDetails,
+    required this.onAddMember,
+    required this.onUpdateMemberRole,
+    required this.onRemoveMember,
+    required this.onDeleteClass,
+    required this.onJoinClass,
     required this.onLogout,
     required this.onToggleTheme,
   });
 
   final bool isTeacher;
-  final List<Classroom> classrooms;
+  final List<ClassModel> classrooms;
+  final List<ClassNotification> notifications;
+  final bool isLoadingClasses;
+  final Future<void> Function() onRefreshClasses;
+  final Future<ClassModel> Function({required String name, String? description})
+  onCreateClass;
+  final Future<List<User>> Function(String keyword) onSearchUsers;
+  final Future<void> Function({
+    required String classId,
+    required List<String> studentIds,
+  })
+  onAddMembersToClass;
+  final Future<ClassModel> Function({
+    required ClassModel classModel,
+    required String name,
+    String? description,
+  })
+  onUpdateClass;
+  final Future<ClassDetails> Function(String classId) onFetchClassDetails;
+  final Future<ClassMember> Function({
+    required String classId,
+    required String userId,
+    String permission,
+  })
+  onAddMember;
+  final Future<ClassMember> Function({
+    required String classId,
+    required String userId,
+    required String role,
+  })
+  onUpdateMemberRole;
+  final Future<void> Function({required String classId, required String userId})
+  onRemoveMember;
+  final Future<void> Function(ClassModel classModel) onDeleteClass;
+  final Future<ClassModel?> Function(String classId) onJoinClass;
   final VoidCallback onLogout;
   final VoidCallback onToggleTheme;
 
@@ -86,6 +137,19 @@ class _HomeScreenState extends State<HomeScreen> {
         return ClassManagementScreen(
           isTeacher: widget.isTeacher,
           classrooms: widget.classrooms,
+          notifications: widget.notifications,
+          isLoading: widget.isLoadingClasses,
+          onRefresh: widget.onRefreshClasses,
+          onCreateClass: widget.onCreateClass,
+          onSearchUsers: widget.onSearchUsers,
+          onAddMembersToClass: widget.onAddMembersToClass,
+          onUpdateClass: widget.onUpdateClass,
+          onFetchClassDetails: widget.onFetchClassDetails,
+          onAddMember: widget.onAddMember,
+          onUpdateMemberRole: widget.onUpdateMemberRole,
+          onRemoveMember: widget.onRemoveMember,
+          onDeleteClass: widget.onDeleteClass,
+          onJoinClass: widget.onJoinClass,
           currentThemeMode: currentThemeMode,
           onThemeToggle: _handleThemeModeChange,
         );
