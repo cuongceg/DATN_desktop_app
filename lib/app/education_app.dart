@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import '../models/classroom.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../models/class_details.dart';
+import '../models/class_member.dart';
+import '../models/class_model.dart';
+import '../models/class_notification.dart';
+import '../models/user.dart';
 import '../models/user_role.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/login/login_screen.dart';
+import '../services/api_client.dart';
+import '../services/api_service.dart';
+import '../services/auth_storage.dart';
 import '../theme/app_theme.dart';
 
 class EducationDesktopApp extends StatefulWidget {
@@ -16,85 +25,25 @@ class EducationDesktopApp extends StatefulWidget {
 
 class _EducationDesktopAppState extends State<EducationDesktopApp> {
   ThemeMode _themeMode = ThemeMode.light;
-  UserRole? _loggedInRole;
+  User? _currentUser;
+  bool _isRestoringSession = true;
+  bool _isLoadingClasses = false;
+  List<ClassModel> _classes = const [];
+  final List<ClassNotification> _notifications = [];
 
-  final List<Classroom> _teacherClasses = const [
-    Classroom(
-      id: 'T01',
-      name: 'Introduction to Python Programming',
-      studentCount: 38,
-      classCode: 'IT-PY101',
-    ),
-    Classroom(
-      id: 'T02',
-      name: 'Data Structures and Algorithms',
-      studentCount: 32,
-      classCode: 'IT-DSA201',
-    ),
-    Classroom(
-      id: 'T03',
-      name: 'Web Application Development',
-      studentCount: 40,
-      classCode: 'IT-WEB301',
-    ),
-    Classroom(
-      id: 'T04',
-      name: 'Database Systems',
-      studentCount: 35,
-      classCode: 'IT-DB202',
-    ),
-    Classroom(
-      id: 'T05',
-      name: 'Applied Artificial Intelligence',
-      studentCount: 41,
-      classCode: 'IT-AI401',
-    ),
-    Classroom(
-      id: 'T06',
-      name: 'Computer Networks and Security',
-      studentCount: 33,
-      classCode: 'IT-NET303',
-    ),
-  ];
+  late final AuthStorage _authStorage;
+  late final EducationApiService _apiService;
 
-  final List<Classroom> _studentClasses = const [
-    Classroom(
-      id: 'S01',
-      name: 'Introduction to Data Science',
-      teacherName: 'Mr. Nguyen Minh Duc',
-      progress: 0.72,
-    ),
-    Classroom(
-      id: 'S02',
-      name: 'Object-Oriented Java Programming',
-      teacherName: 'Ms. Le Thu Trang',
-      progress: 0.45,
-    ),
-    Classroom(
-      id: 'S03',
-      name: 'Mobile Development with Flutter',
-      teacherName: 'Mr. Pham Quoc Huy',
-      progress: 0.83,
-    ),
-    Classroom(
-      id: 'S04',
-      name: 'Practical DevOps and CI/CD',
-      teacherName: 'Mr. Tran Anh Tuan',
-      progress: 0.31,
-    ),
-    Classroom(
-      id: 'S05',
-      name: 'Linux for Developers',
-      teacherName: 'Ms. Doan Ngoc Ha',
-      progress: 0.58,
-    ),
-    Classroom(
-      id: 'S06',
-      name: 'Fundamentals of Information Security',
-      teacherName: 'Mr. Vu Thanh Son',
-      progress: 0.9,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _authStorage = AuthStorage(const FlutterSecureStorage());
+    _apiService = EducationApiService(
+      apiClient: ApiClient(authStorage: _authStorage),
+      storage: _authStorage,
+    );
+    _restoreSession();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,29 +59,248 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
         GlobalWidgetsLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
       ],
-      home: _loggedInRole == null
+      home: _isRestoringSession
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          : _currentUser == null
           ? LoginScreen(
               themeMode: _themeMode,
               onToggleTheme: _toggleTheme,
-              onLogin: (role) {
-                setState(() {
-                  _loggedInRole = role;
-                });
-              },
+              onLogin: _handleLogin,
             )
           : HomeScreen(
-              isTeacher: _loggedInRole == UserRole.teacher,
-              classrooms: _loggedInRole == UserRole.teacher
-                  ? _teacherClasses
-                  : _studentClasses,
-              onLogout: () {
-                setState(() {
-                  _loggedInRole = null;
-                });
-              },
+              isTeacher: _isTeacher,
+              classrooms: _classes,
+              notifications: _notifications,
+              isLoadingClasses: _isLoadingClasses,
+              onRefreshClasses: _refreshClassrooms,
+              onCreateClass: _createClass,
+              onSearchUsers: _searchUsers,
+              onAddMembersToClass: _addMembersToClass,
+              onUpdateClass: _updateClass,
+              onFetchClassDetails: _fetchClassDetails,
+              onAddMember: _addMember,
+              onUpdateMemberRole: _updateMemberRole,
+              onRemoveMember: _removeMember,
+              onDeleteClass: _deleteClass,
+              onJoinClass: _joinClass,
+              onLogout: _logout,
               onToggleTheme: _toggleTheme,
             ),
     );
+  }
+
+  Future<void> _restoreSession() async {
+    try {
+      final token = await _authStorage.readToken();
+      if (token == null || token.isEmpty) {
+        return;
+      }
+
+      final cachedUser = await _authStorage.readUser();
+      if (cachedUser == null) {
+        await _apiService.logout();
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUser = cachedUser;
+      });
+
+      await _refreshClassrooms();
+    } catch (_) {
+      await _apiService.logout();
+      if (mounted) {
+        setState(() {
+          _currentUser = null;
+          _classes = const [];
+          _notifications.clear();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoringSession = false;
+        });
+      }
+    }
+  }
+
+  bool get _isTeacher {
+    if (_currentUser == null) {
+      return false;
+    }
+    return _currentUser!.role.toLowerCase() == UserRole.teacher.apiValue;
+  }
+
+  Future<void> _handleLogin({
+    required String email,
+    required String password,
+    required UserRole selectedRole,
+  }) async {
+    final result = await _apiService.login(email: email, password: password);
+    final role = UserRoleX.fromApiValue(result.user.role);
+    if (role != selectedRole) {
+      await _apiService.logout();
+      throw Exception(
+        'Logged in as ${result.user.role}, but ${selectedRole.apiValue} was selected.',
+      );
+    }
+
+    setState(() {
+      _currentUser = result.user;
+    });
+    await _refreshClassrooms();
+  }
+
+  Future<void> _refreshClassrooms() async {
+    if (_currentUser == null) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingClasses = true;
+    });
+
+    try {
+      final classes = await _apiService.getClasses();
+      setState(() {
+        _classes = classes;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingClasses = false;
+        });
+      }
+    }
+  }
+
+  Future<ClassModel> _createClass({
+    required String name,
+    String? description,
+  }) async {
+    final created = await _apiService.createClass(
+      name: name,
+      description: description,
+    );
+    setState(() {
+      _classes = [created, ..._classes];
+    });
+    return created;
+  }
+
+  Future<List<User>> _searchUsers(String keyword) async {
+    final users = await _apiService.searchUsers(keyword: keyword);
+    final currentUserId = _currentUser?.id;
+    return users
+        .where((user) => user.role.toLowerCase() != 'admin')
+        .where((user) => user.id != currentUserId)
+        .toList(growable: false);
+  }
+
+  Future<void> _addMembersToClass({
+    required String classId,
+    required List<String> studentIds,
+  }) {
+    return _apiService.addMembersToClassBulk(
+      classId: classId,
+      studentIds: studentIds,
+    );
+  }
+
+  Future<ClassModel> _updateClass({
+    required ClassModel classModel,
+    required String name,
+    String? description,
+  }) async {
+    final updated = await _apiService.updateClass(
+      id: classModel.id,
+      name: name,
+      description: description,
+    );
+
+    setState(() {
+      _classes = _classes
+          .map((item) => item.id == updated.id ? updated : item)
+          .toList(growable: false);
+    });
+    return updated;
+  }
+
+  Future<ClassDetails> _fetchClassDetails(String classId) {
+    return _apiService.fetchClassDetails(id: classId);
+  }
+
+  Future<ClassMember> _addMember({
+    required String classId,
+    required String userId,
+    String permission = 'Member',
+  }) {
+    return _apiService.addMember(
+      classId: classId,
+      userId: userId,
+      permission: permission,
+    );
+  }
+
+  Future<ClassMember> _updateMemberRole({
+    required String classId,
+    required String userId,
+    required String role,
+  }) {
+    return _apiService.updateMemberRole(
+      classId: classId,
+      userId: userId,
+      role: role,
+    );
+  }
+
+  Future<void> _removeMember({
+    required String classId,
+    required String userId,
+  }) {
+    return _apiService.removeMember(classId: classId, userId: userId);
+  }
+
+  Future<void> _deleteClass(ClassModel classModel) async {
+    await _apiService.deleteClass(classModel.id);
+    setState(() {
+      _classes = _classes.where((item) => item.id != classModel.id).toList();
+    });
+  }
+
+  Future<ClassModel?> _joinClass(String classCode) async {
+    final joinedClass = await _apiService.joinClass(classCode);
+
+    setState(() {
+      final alreadyExists = _classes.any((item) => item.id == joinedClass.id);
+      if (!alreadyExists) {
+        _classes = [joinedClass, ..._classes];
+      }
+      _notifications.insert(
+        0,
+        ClassNotification(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          message: 'You were added to class ${joinedClass.name}.',
+          createdAt: DateTime.now(),
+        ),
+      );
+    });
+
+    return joinedClass;
+  }
+
+  Future<void> _logout() async {
+    await _apiService.logout();
+    setState(() {
+      _currentUser = null;
+      _classes = const [];
+      _notifications.clear();
+    });
   }
 
   void _toggleTheme() {
