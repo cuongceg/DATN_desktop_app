@@ -2,16 +2,52 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/education_app.dart';
+import 'features/auth/data/datasources/auth_local_datasource.dart';
+import 'features/auth/data/datasources/auth_remote_datasource.dart';
+import 'features/auth/data/repositories/auth_repository_impl.dart';
+import 'features/auth/domain/usecases/get_current_user_usecase.dart';
+import 'features/auth/domain/usecases/sign_in_usecase.dart';
+import 'features/auth/domain/usecases/sign_out_usecase.dart';
+import 'features/auth/presentation/controllers/auth_notifier.dart';
+import 'services/api_client.dart';
+import 'services/auth_storage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await _configureDesktopWindow();
 
-  runApp(const EducationDesktopApp());
+  // --- Dependency wiring ---
+  const secureStorage = FlutterSecureStorage();
+
+  // Legacy AuthStorage kept alive so ApiClient interceptor can still read
+  // the token written by AuthLocalDataSourceImpl (same storage key).
+  final authStorage = AuthStorage(secureStorage);
+  final apiClient = ApiClient(authStorage: authStorage);
+
+  final authRepository = AuthRepositoryImpl(
+    remoteDataSource: AuthRemoteDataSourceImpl(apiClient.dio),
+    localDataSource: AuthLocalDataSourceImpl(secureStorage),
+  );
+
+  runApp(
+    ChangeNotifierProvider<AuthNotifier>(
+      create: (_) => AuthNotifier(
+        signInUseCase: SignInUseCase(authRepository),
+        signOutUseCase: SignOutUseCase(authRepository),
+        getCurrentUserUseCase: GetCurrentUserUseCase(authRepository),
+      ),
+      child: EducationDesktopApp(
+        authStorage: authStorage,
+        apiClient: apiClient,
+      ),
+    ),
+  );
 }
 
 Future<void> _configureDesktopWindow() async {

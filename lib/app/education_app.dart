@@ -1,23 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:provider/provider.dart';
 
+import '../features/auth/presentation/controllers/auth_notifier.dart';
 import '../models/class_details.dart';
 import '../models/class_member.dart';
 import '../models/class_model.dart';
 import '../models/class_notification.dart';
 import '../models/user.dart';
-import '../models/user_role.dart';
 import '../screens/home/home_screen.dart';
-import '../screens/login/login_screen.dart';
+import '../features/auth/presentation/screens/login_screen.dart';
 import '../services/api_client.dart';
 import '../services/api_service.dart';
 import '../services/auth_storage.dart';
 import '../theme/app_theme.dart';
 
 class EducationDesktopApp extends StatefulWidget {
-  const EducationDesktopApp({super.key});
+  const EducationDesktopApp({
+    super.key,
+    required this.authStorage,
+    required this.apiClient,
+  });
+
+  final AuthStorage authStorage;
+  final ApiClient apiClient;
 
   @override
   State<EducationDesktopApp> createState() => _EducationDesktopAppState();
@@ -25,50 +32,74 @@ class EducationDesktopApp extends StatefulWidget {
 
 class _EducationDesktopAppState extends State<EducationDesktopApp> {
   ThemeMode _themeMode = ThemeMode.light;
-  User? _currentUser;
-  bool _isRestoringSession = true;
   bool _isLoadingClasses = false;
   List<ClassModel> _classes = const [];
   final List<ClassNotification> _notifications = [];
 
-  late final AuthStorage _authStorage;
   late final EducationApiService _apiService;
 
   @override
   void initState() {
     super.initState();
-    _authStorage = AuthStorage(const FlutterSecureStorage());
     _apiService = EducationApiService(
-      apiClient: ApiClient(authStorage: _authStorage),
-      storage: _authStorage,
+      apiClient: widget.apiClient,
+      storage: widget.authStorage,
     );
-    _restoreSession();
+
+    // Restore session and listen for auth changes to refresh classrooms.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthNotifier>();
+      auth.addListener(_onAuthChanged);
+      auth.tryRestoreSession();
+    });
+  }
+
+  @override
+  void dispose() {
+    // Safe: context.read does not listen, but addListener requires removal.
+    // ignore: invalid_use_of_protected_member
+    context.read<AuthNotifier>().removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  /// Called whenever [AuthNotifier] notifies. Refreshes classrooms on login.
+  void _onAuthChanged() {
+    final auth = context.read<AuthNotifier>();
+    if (auth.isAuthenticated) {
+      _refreshClassrooms();
+    } else {
+      // User signed out — clear classroom data.
+      if (mounted) {
+        setState(() {
+          _classes = const [];
+          _notifications.clear();
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthNotifier>();
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Education Desktop UI',
       themeMode: _themeMode,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
       ],
-      home: _isRestoringSession
+      home: auth.isRestoringSession
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-          : _currentUser == null
-          ? LoginScreen(
-              themeMode: _themeMode,
-              onToggleTheme: _toggleTheme,
-              onLogin: _handleLogin,
-            )
+          : auth.currentUser == null
+          ? LoginScreen(themeMode: _themeMode, onToggleTheme: _toggleTheme)
           : HomeScreen(
-              isTeacher: _isTeacher,
+              isTeacher: _isTeacher(auth),
               classrooms: _classes,
               notifications: _notifications,
               isLoadingClasses: _isLoadingClasses,
@@ -89,94 +120,23 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
     );
   }
 
-  Future<void> _restoreSession() async {
-    try {
-      final token = await _authStorage.readToken();
-      if (token == null || token.isEmpty) {
-        return;
-      }
-
-      final cachedUser = await _authStorage.readUser();
-      if (cachedUser == null) {
-        await _apiService.logout();
-        return;
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _currentUser = cachedUser;
-      });
-
-      await _refreshClassrooms();
-    } catch (_) {
-      await _apiService.logout();
-      if (mounted) {
-        setState(() {
-          _currentUser = null;
-          _classes = const [];
-          _notifications.clear();
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRestoringSession = false;
-        });
-      }
-    }
-  }
-
-  bool get _isTeacher {
-    if (_currentUser == null) {
-      return false;
-    }
-    return _currentUser!.role.toLowerCase() == UserRole.teacher.apiValue;
-  }
-
-  Future<void> _handleLogin({
-    required String email,
-    required String password,
-    required UserRole selectedRole,
-  }) async {
-    final result = await _apiService.login(email: email, password: password);
-    final role = UserRoleX.fromApiValue(result.user.role);
-    if (role != selectedRole) {
-      await _apiService.logout();
-      throw Exception(
-        'Logged in as ${result.user.role}, but ${selectedRole.apiValue} was selected.',
-      );
-    }
-
-    setState(() {
-      _currentUser = result.user;
-    });
-    await _refreshClassrooms();
+  bool _isTeacher(AuthNotifier auth) {
+    return auth.currentUser?.role.toLowerCase() == 'teacher';
   }
 
   Future<void> _refreshClassrooms() async {
-    if (_currentUser == null) {
-      return;
-    }
-
-    setState(() {
-      _isLoadingClasses = true;
-    });
-
+    if (!mounted) return;
+    setState(() => _isLoadingClasses = true);
     try {
       final classes = await _apiService.getClasses();
-      setState(() {
-        _classes = classes;
-      });
+      if (mounted) setState(() => _classes = classes);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingClasses = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingClasses = false);
     }
+  }
+
+  Future<void> _logout() async {
+    await context.read<AuthNotifier>().signOut();
   }
 
   Future<ClassModel> _createClass({
@@ -187,18 +147,16 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
       name: name,
       description: description,
     );
-    setState(() {
-      _classes = [created, ..._classes];
-    });
+    setState(() => _classes = [created, ..._classes]);
     return created;
   }
 
   Future<List<User>> _searchUsers(String keyword) async {
+    final auth = context.read<AuthNotifier>();
     final users = await _apiService.searchUsers(keyword: keyword);
-    final currentUserId = _currentUser?.id;
     return users
-        .where((user) => user.role.toLowerCase() != 'admin')
-        .where((user) => user.id != currentUserId)
+        .where((u) => u.role.toLowerCase() != 'admin')
+        .where((u) => u.id != auth.currentUser?.id)
         .toList(growable: false);
   }
 
@@ -222,7 +180,6 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
       name: name,
       description: description,
     );
-
     setState(() {
       _classes = _classes
           .map((item) => item.id == updated.id ? updated : item)
@@ -275,7 +232,6 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
 
   Future<ClassModel?> _joinClass(String classCode) async {
     final joinedClass = await _apiService.joinClass(classCode);
-
     setState(() {
       final alreadyExists = _classes.any((item) => item.id == joinedClass.id);
       if (!alreadyExists) {
@@ -290,17 +246,7 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
         ),
       );
     });
-
     return joinedClass;
-  }
-
-  Future<void> _logout() async {
-    await _apiService.logout();
-    setState(() {
-      _currentUser = null;
-      _classes = const [];
-      _notifications.clear();
-    });
   }
 
   void _toggleTheme() {
