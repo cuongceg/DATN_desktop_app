@@ -4,9 +4,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../features/auth/presentation/controllers/auth_notifier.dart';
+import '../features/classroom/presentation/controllers/classroom_notifier.dart';
 import '../models/class_details.dart';
 import '../models/class_member.dart';
-import '../models/class_model.dart';
 import '../models/class_notification.dart';
 import '../models/user.dart';
 import '../screens/home/home_screen.dart';
@@ -32,10 +32,11 @@ class EducationDesktopApp extends StatefulWidget {
 
 class _EducationDesktopAppState extends State<EducationDesktopApp> {
   ThemeMode _themeMode = ThemeMode.light;
-  bool _isLoadingClasses = false;
-  List<ClassModel> _classes = const [];
   final List<ClassNotification> _notifications = [];
 
+  // Legacy service kept for non-classroom operations that are not yet
+  // migrated: searchUsers, member management, class details.
+  // REFACTOR: Remove in REFACTOR-003 when those are also feature-ified.
   late final EducationApiService _apiService;
 
   @override
@@ -56,7 +57,6 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
 
   @override
   void dispose() {
-    // Safe: context.read does not listen, but addListener requires removal.
     // ignore: invalid_use_of_protected_member
     context.read<AuthNotifier>().removeListener(_onAuthChanged);
     super.dispose();
@@ -69,9 +69,9 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
       _refreshClassrooms();
     } else {
       // User signed out — clear classroom data.
+      context.read<ClassroomNotifier>().clear();
       if (mounted) {
         setState(() {
-          _classes = const [];
           _notifications.clear();
         });
       }
@@ -81,6 +81,8 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthNotifier>();
+    // Watch ClassroomNotifier so the loading spinner in child screens rebuilds.
+    context.watch<ClassroomNotifier>();
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -100,20 +102,13 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
           ? LoginScreen(themeMode: _themeMode, onToggleTheme: _toggleTheme)
           : HomeScreen(
               isTeacher: _isTeacher(auth),
-              classrooms: _classes,
               notifications: _notifications,
-              isLoadingClasses: _isLoadingClasses,
-              onRefreshClasses: _refreshClassrooms,
-              onCreateClass: _createClass,
               onSearchUsers: _searchUsers,
               onAddMembersToClass: _addMembersToClass,
-              onUpdateClass: _updateClass,
               onFetchClassDetails: _fetchClassDetails,
               onAddMember: _addMember,
               onUpdateMemberRole: _updateMemberRole,
               onRemoveMember: _removeMember,
-              onDeleteClass: _deleteClass,
-              onJoinClass: _joinClass,
               onLogout: _logout,
               onToggleTheme: _toggleTheme,
             ),
@@ -124,32 +119,25 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
     return auth.currentUser?.role.toLowerCase() == 'teacher';
   }
 
+  // ---------------------------------------------------------------------------
+  // Classroom actions — delegate to ClassroomNotifier
+  // ---------------------------------------------------------------------------
+
   Future<void> _refreshClassrooms() async {
-    if (!mounted) return;
-    setState(() => _isLoadingClasses = true);
-    try {
-      final classes = await _apiService.getClasses();
-      if (mounted) setState(() => _classes = classes);
-    } finally {
-      if (mounted) setState(() => _isLoadingClasses = false);
-    }
+    final auth = context.read<AuthNotifier>();
+    final userId = auth.currentUser?.id ?? '';
+    await context.read<ClassroomNotifier>().loadClassrooms(userId);
   }
 
   Future<void> _logout() async {
     await context.read<AuthNotifier>().signOut();
   }
 
-  Future<ClassModel> _createClass({
-    required String name,
-    String? description,
-  }) async {
-    final created = await _apiService.createClass(
-      name: name,
-      description: description,
-    );
-    setState(() => _classes = [created, ..._classes]);
-    return created;
-  }
+
+  // ---------------------------------------------------------------------------
+  // Legacy operations still using EducationApiService (out of scope for
+  // REFACTOR-002): user search, member management, class details.
+  // ---------------------------------------------------------------------------
 
   Future<List<User>> _searchUsers(String keyword) async {
     final auth = context.read<AuthNotifier>();
@@ -168,24 +156,6 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
       classId: classId,
       studentIds: studentIds,
     );
-  }
-
-  Future<ClassModel> _updateClass({
-    required ClassModel classModel,
-    required String name,
-    String? description,
-  }) async {
-    final updated = await _apiService.updateClass(
-      id: classModel.id,
-      name: name,
-      description: description,
-    );
-    setState(() {
-      _classes = _classes
-          .map((item) => item.id == updated.id ? updated : item)
-          .toList(growable: false);
-    });
-    return updated;
   }
 
   Future<ClassDetails> _fetchClassDetails(String classId) {
@@ -223,37 +193,10 @@ class _EducationDesktopAppState extends State<EducationDesktopApp> {
     return _apiService.removeMember(classId: classId, userId: userId);
   }
 
-  Future<void> _deleteClass(ClassModel classModel) async {
-    await _apiService.deleteClass(classModel.id);
-    setState(() {
-      _classes = _classes.where((item) => item.id != classModel.id).toList();
-    });
-  }
-
-  Future<ClassModel?> _joinClass(String classCode) async {
-    final joinedClass = await _apiService.joinClass(classCode);
-    setState(() {
-      final alreadyExists = _classes.any((item) => item.id == joinedClass.id);
-      if (!alreadyExists) {
-        _classes = [joinedClass, ..._classes];
-      }
-      _notifications.insert(
-        0,
-        ClassNotification(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          message: 'You were added to class ${joinedClass.name}.',
-          createdAt: DateTime.now(),
-        ),
-      );
-    });
-    return joinedClass;
-  }
-
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.dark
-          ? ThemeMode.light
-          : ThemeMode.dark;
+      _themeMode =
+          _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
     });
   }
 }

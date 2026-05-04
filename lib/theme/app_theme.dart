@@ -1,28 +1,28 @@
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
+import '../core/constants/app_colors.dart';
+import '../core/constants/app_sizes.dart';
 
 class AppTheme {
   static ThemeData light() {
     const colorScheme = ColorScheme(
       brightness: Brightness.light,
-      primary: Color(0xFF2B579A),
+      primary: AppColors.primary,
       onPrimary: Colors.white,
-      secondary: Color(0xFF0078D4),
+      primaryContainer: AppColors.primaryContainer,
+      secondary: AppColors.secondary,
       onSecondary: Colors.white,
-      error: Color(0xFFB3261E),
-      onError: Colors.white,
-      surface: Color(0xFFF8FAFC),
-      onSurface: Color(0xFF1C1D21),
-      outline: Color(0xFFC2C8D1),
-      tertiary: Color(0xFF0F766E),
+      secondaryContainer: AppColors.secondaryContainer,
+      tertiary: AppColors.tertiary,
       onTertiary: Colors.white,
-      surfaceContainerHighest: Color(0xFFE8ECF3),
-      onSurfaceVariant: Color(0xFF454C57),
-      inverseSurface: Color(0xFF2C313A),
-      onInverseSurface: Color(0xFFF2F4F8),
-      inversePrimary: Color(0xFFA5C8FF),
-      shadow: Color(0x33000000),
-      scrim: Color(0x66000000),
-      surfaceTint: Color(0xFF2B579A),
+      tertiaryContainer: AppColors.tertiaryContainer,
+      error: AppColors.error,
+      onError: Colors.white,
+      surface: AppColors.surface,
+      onSurface: AppColors.onSurface,
+      outline: AppColors.outline,
+      outlineVariant: AppColors.outlineVariant,
+      onSurfaceVariant: AppColors.onSurfaceVariant,
+      surfaceTint: AppColors.primary,
     );
 
     return ThemeData(
@@ -31,8 +31,16 @@ class AppTheme {
       scaffoldBackgroundColor: colorScheme.surface,
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        fillColor: AppColors.surfaceContainer,
+        border: OutlineInputBorder(borderRadius: AppSizes.brMedium),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppSizes.brMedium,
+          borderSide: const BorderSide(color: AppColors.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppSizes.brMedium,
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
       ),
     );
   }

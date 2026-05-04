@@ -14,6 +14,8 @@ import 'features/auth/domain/usecases/get_current_user_usecase.dart';
 import 'features/auth/domain/usecases/sign_in_usecase.dart';
 import 'features/auth/domain/usecases/sign_out_usecase.dart';
 import 'features/auth/presentation/controllers/auth_notifier.dart';
+import 'features/classroom/classroom_providers.dart';
+import 'features/classroom/presentation/controllers/classroom_notifier.dart';
 import 'services/api_client.dart';
 import 'services/auth_storage.dart';
 
@@ -36,12 +38,19 @@ Future<void> main() async {
   );
 
   runApp(
-    ChangeNotifierProvider<AuthNotifier>(
-      create: (_) => AuthNotifier(
-        signInUseCase: SignInUseCase(authRepository),
-        signOutUseCase: SignOutUseCase(authRepository),
-        getCurrentUserUseCase: GetCurrentUserUseCase(authRepository),
-      ),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthNotifier>(
+          create: (_) => AuthNotifier(
+            signInUseCase: SignInUseCase(authRepository),
+            signOutUseCase: SignOutUseCase(authRepository),
+            getCurrentUserUseCase: GetCurrentUserUseCase(authRepository),
+          ),
+        ),
+        ChangeNotifierProvider<ClassroomNotifier>(
+          create: (_) => ClassroomProviders.createNotifier(apiClient.dio),
+        ),
+      ],
       child: EducationDesktopApp(
         authStorage: authStorage,
         apiClient: apiClient,

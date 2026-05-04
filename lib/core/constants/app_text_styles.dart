@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 
 class AppTextStyles {
   // Lexend - Headlines & Display
@@ -11,7 +10,6 @@ class AppTextStyles {
     fontWeight: FontWeight.w700,
     height: 44 / 36,
     letterSpacing: -0.72, // -0.02em
-    color: AppColors.onSurface,
   );
 
   static const TextStyle headlineMedium = TextStyle(
@@ -19,7 +17,6 @@ class AppTextStyles {
     fontSize: 24,
     fontWeight: FontWeight.w600,
     height: 32 / 24,
-    color: AppColors.onSurface,
   );
 
   // Inter - Body & Labels
@@ -30,7 +27,6 @@ class AppTextStyles {
     fontSize: 16,
     fontWeight: FontWeight.w400,
     height: 24 / 16,
-    color: AppColors.onSurface,
   );
 
   static const TextStyle bodySmall = TextStyle(
@@ -38,7 +34,6 @@ class AppTextStyles {
     fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 20 / 14,
-    color: AppColors.onSurfaceVariant,
   );
 
   static const TextStyle labelCaps = TextStyle(
@@ -47,7 +42,6 @@ class AppTextStyles {
     fontWeight: FontWeight.w600,
     height: 16 / 12,
     letterSpacing: 0.6, // 0.05em
-    color: AppColors.onSurfaceVariant,
   );
 
   static const TextStyle tableHeader = TextStyle(
@@ -55,6 +49,5 @@ class AppTextStyles {
     fontSize: 13,
     fontWeight: FontWeight.w600,
     height: 18 / 13,
-    color: AppColors.onSurface,
   );
 }
