@@ -10,6 +10,7 @@ class ClassroomEntity {
     this.description,
     this.createdAt,
     this.studentCount,
+    this.status,
   });
 
   /// Unique identifier of the classroom.
@@ -32,6 +33,9 @@ class ClassroomEntity {
 
   /// Cached count of enrolled students.
   final int? studentCount;
+
+  /// The current status of the classroom.
+  final String? status;
 
   @override
   bool operator ==(Object other) =>

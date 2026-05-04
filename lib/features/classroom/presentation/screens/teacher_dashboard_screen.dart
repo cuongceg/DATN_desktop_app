@@ -8,7 +8,7 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../../models/class_details.dart';
 import '../../../../../models/class_member.dart';
 import '../../../../../models/user.dart';
-import '../../../../../screens/class_management/edit_class_screen.dart';
+import 'edit_class_screen.dart';
 import '../../../../../models/class_model.dart';
 import '../controllers/classroom_notifier.dart';
 import '../widgets/create_classroom_dialog_widget.dart';
@@ -71,12 +71,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   Widget build(BuildContext context) {
     final notifier = context.watch<ClassroomNotifier>();
     final allClassrooms = notifier.classrooms;
-    
+
     final classrooms = allClassrooms.where((c) {
-      if (_selectedFilter == 'All Classes' || _selectedFilter == 'Active') {
-        return true;
-      }
-      return false; // Archived and Drafts are currently empty
+      if (_selectedFilter == 'All Classes') return true;
+      final target = _selectedFilter.toLowerCase();
+      final status = (c.status ?? 'active').toLowerCase();
+      return status == target;
     }).toList();
 
     final availableTeams = allClassrooms
@@ -97,21 +97,29 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               child: SearchBar(
                 leading: const Icon(Icons.search, color: AppColors.outline),
                 hintText: 'Search classes, students, or resources...',
-                hintStyle: WidgetStatePropertyAll(AppTextStyles.bodyLarge.copyWith(color: AppColors.outline)),
+                hintStyle: WidgetStatePropertyAll(
+                  AppTextStyles.bodyLarge.copyWith(color: AppColors.outline),
+                ),
                 elevation: const WidgetStatePropertyAll(0),
                 backgroundColor: WidgetStatePropertyAll(
-                  isLight ? AppColors.white : AppColors.surfaceContainer.withValues(alpha: 0.1)
+                  isLight
+                      ? AppColors.white
+                      : AppColors.surfaceContainer.withValues(alpha: 0.1),
                 ),
                 shape: WidgetStatePropertyAll(
                   RoundedRectangleBorder(
                     borderRadius: AppSizes.brFull,
                     side: BorderSide(
-                      color: isLight ? AppColors.luminousBorder : Colors.white.withValues(alpha: 0.1),
+                      color: isLight
+                          ? AppColors.luminousBorder
+                          : Colors.white.withValues(alpha: 0.1),
                       width: 1,
                     ),
                   ),
                 ),
-                padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSizes.md)),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: AppSizes.md),
+                ),
               ),
             ),
             const SizedBox(width: AppSizes.md),
@@ -128,8 +136,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     color: AppColors.primary.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
-                  )
-                ]
+                  ),
+                ],
               ),
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
@@ -148,13 +156,20 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               ),
             ),
             const SizedBox(width: AppSizes.lg),
-            const Icon(Icons.notifications_none, color: AppColors.onSurfaceVariant),
+            const Icon(
+              Icons.notifications_none,
+              color: AppColors.onSurfaceVariant,
+            ),
             const SizedBox(width: AppSizes.md),
             PopupMenuButton<_HeaderMenuAction>(
               tooltip: 'Tùy chọn tài khoản',
               onSelected: (action) {
                 if (action == _HeaderMenuAction.toggleTheme) {
-                  onThemeToggle(currentThemeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light);
+                  onThemeToggle(
+                    currentThemeMode == ThemeMode.light
+                        ? ThemeMode.dark
+                        : ThemeMode.light,
+                  );
                   return;
                 }
                 onLogout();
@@ -187,14 +202,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         const SizedBox(height: AppSizes.xl),
 
         // Welcome Section
-        Text('Welcome back, Professor', style: AppTextStyles.displayLarge.copyWith(
-          color: isLight ? AppColors.onSurface : Colors.white,
-        )),
+        Text(
+          'Welcome back, Professor',
+          style: AppTextStyles.displayLarge.copyWith(
+            color: isLight ? AppColors.onSurface : Colors.white,
+          ),
+        ),
         const SizedBox(height: AppSizes.xs),
         Text(
-          'You have ${classrooms.length} active classes for the Spring 2024 semester.',
+          'You have ${classrooms.length} active classes for the 2026.2 semester.',
           style: AppTextStyles.bodyLarge.copyWith(
-            color: isLight ? AppColors.onSurfaceVariant : AppColors.outlineVariant,
+            color: isLight
+                ? AppColors.onSurfaceVariant
+                : AppColors.outlineVariant,
           ),
         ),
         const SizedBox(height: AppSizes.xl),
@@ -219,12 +239,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               isActive: _selectedFilter == 'Archived',
               onTap: () => setState(() => _selectedFilter = 'Archived'),
             ),
-            const SizedBox(width: AppSizes.sm),
-            _FilterChip(
-              label: 'Drafts',
-              isActive: _selectedFilter == 'Drafts',
-              onTap: () => setState(() => _selectedFilter = 'Drafts'),
-            ),
           ],
         ),
         const SizedBox(height: AppSizes.lg),
@@ -246,9 +260,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     ],
                   )
                 : classrooms.isEmpty
-                ? const _EmptyState(
-                    message:
-                        'Bạn chưa có lớp học nào.\nNhấn "Create New Class" để bắt đầu.',
+                ? _EmptyState(
+                    message: allClassrooms.isEmpty
+                        ? 'Bạn chưa có lớp học nào.\nNhấn "Create New Class" để bắt đầu.'
+                        : 'Không có lớp học nào trong danh mục "$_selectedFilter".\nHãy thay đổi bộ lọc hoặc thêm lớp mới.',
                   )
                 : _ClassroomGrid(
                     classrooms: classrooms,
@@ -260,8 +275,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                   ),
           ),
         ),
-        
-
       ],
     );
   }
@@ -294,6 +307,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       description: classroom.description,
       createdAt: classroom.createdAt,
       studentCount: classroom.studentCount,
+      status: classroom.status,
     );
 
     final updated = await Navigator.of(context).push<ClassModel>(
@@ -322,6 +336,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     description: entity.description,
                     createdAt: entity.createdAt,
                     studentCount: entity.studentCount,
+                    status: entity.status,
                   ),
                 );
           },
@@ -472,32 +487,52 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, required this.isActive, required this.onTap});
+  const _FilterChip({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
   final String label;
   final bool isActive;
   final VoidCallback onTap;
-  
+
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
     return InkWell(
       onTap: onTap,
       borderRadius: AppSizes.brFull,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSizes.lg, vertical: AppSizes.unit),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.lg,
+          vertical: AppSizes.unit,
+        ),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primaryContainer : AppColors.white,
+          color: isActive
+              ? AppColors.primaryContainer
+              : isLight
+              ? AppColors.white
+              : Colors.transparent,
           borderRadius: AppSizes.brFull,
-          border: isActive ? null : Border.all(color: AppColors.surfaceContainer, width: 1),
+          border: isActive
+              ? null
+              : Border.all(
+                  color: isLight
+                      ? AppColors.surfaceContainer
+                      : Colors.white.withValues(alpha: 0.1),
+                  width: 1,
+                ),
         ),
         child: Text(
           label,
           style: AppTextStyles.bodyLarge.copyWith(
-          color: isActive 
-            ? AppColors.white 
-            : Theme.of(context).brightness == Brightness.light 
-                ? AppColors.onSurfaceVariant 
-                : AppColors.outlineVariant,
-          fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+            color: isActive
+                ? AppColors.white
+                : isLight
+                ? AppColors.onSurfaceVariant
+                : Colors.white,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
       ),
@@ -506,4 +541,3 @@ class _FilterChip extends StatelessWidget {
 }
 
 enum _HeaderMenuAction { toggleTheme, logout }
-

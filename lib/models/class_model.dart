@@ -7,6 +7,7 @@ class ClassModel {
     this.description,
     this.createdAt,
     this.studentCount,
+    this.status,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class ClassModel {
   final String? description;
   final DateTime? createdAt;
   final int? studentCount;
+  final String? status;
 
   factory ClassModel.fromJson(Map<String, dynamic> json) {
     return ClassModel(
@@ -27,7 +29,10 @@ class ClassModel {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
-      studentCount: json['student_count'] as int?,
+      studentCount: json['student_count'] != null
+          ? int.tryParse(json['student_count'].toString())
+          : null,
+      status: json['status'] as String?,
     );
   }
 
@@ -40,6 +45,7 @@ class ClassModel {
       'description': description,
       'created_at': createdAt?.toIso8601String(),
       'student_count': studentCount,
+      'status': status,
     };
   }
 
@@ -51,6 +57,7 @@ class ClassModel {
     String? description,
     DateTime? createdAt,
     int? studentCount,
+    String? status,
   }) {
     return ClassModel(
       id: id ?? this.id,
@@ -60,6 +67,7 @@ class ClassModel {
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       studentCount: studentCount ?? this.studentCount,
+      status: status ?? this.status,
     );
   }
 }

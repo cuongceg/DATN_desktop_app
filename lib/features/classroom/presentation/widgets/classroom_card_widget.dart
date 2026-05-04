@@ -96,33 +96,32 @@ class ClassroomCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (trailingActions != null)
+                    Positioned(
+                      top: AppSizes.xl,
+                      right: 5.0,
+                      child: trailingActions!,
+                    ),
                   Padding(
                     padding: const EdgeInsets.all(AppSizes.xl),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.15),
-                                borderRadius: AppSizes.brMedium,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                initials,
-                                style: AppTextStyles.headlineMedium.copyWith(
-                                  color: color,
-                                  fontSize: 20,
-                                ),
-                              ),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.15),
+                            borderRadius: AppSizes.brMedium,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            initials,
+                            style: AppTextStyles.headlineMedium.copyWith(
+                              color: color,
+                              fontSize: 20,
                             ),
-                            trailingActions ?? const SizedBox.shrink(),
-                          ],
+                          ),
                         ),
                         const Spacer(),
                         Text(

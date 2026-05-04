@@ -12,6 +12,7 @@ class ClassroomModel extends ClassroomEntity {
     super.description,
     super.createdAt,
     super.studentCount,
+    super.status,
   });
 
   /// Constructs a [ClassroomModel] from a JSON map returned by the API.
@@ -25,7 +26,10 @@ class ClassroomModel extends ClassroomEntity {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
-      studentCount: json['student_count'] as int?,
+      studentCount: json['student_count'] != null
+          ? int.tryParse(json['student_count'].toString())
+          : null,
+      status: json['status'] as String?,
     );
   }
 
@@ -39,6 +43,7 @@ class ClassroomModel extends ClassroomEntity {
       'description': description,
       'created_at': createdAt?.toIso8601String(),
       'student_count': studentCount,
+      'status': status,
     };
   }
 }
