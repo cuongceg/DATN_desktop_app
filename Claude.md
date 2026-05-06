@@ -327,4 +327,4 @@ TranscriptRepository (lưu vào DB cho xem lại)
 Đọc `.agent/skills/ui-refactor.md` cho toàn bộ workflow chi tiết,
 bao gồm prompt mẫu, checklist, và cách map Design DNA sang Flutter constants.
 
-*Cập nhật lần cuối: 26/04/2026 | Người maintain: Domanhcuong*
+*Cập nhật lần cuối: 05/05/2026 | Người maintain: Domanhcuong*
