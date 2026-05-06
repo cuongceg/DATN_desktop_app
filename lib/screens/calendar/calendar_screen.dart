@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+
+import '../../features/auth/presentation/controllers/auth_notifier.dart';
+import '../../features/session/models/session_model.dart';
+import '../../features/session/providers/meeting_room_provider.dart';
+import '../../features/session/providers/session_provider.dart';
+import '../../features/session/screens/meeting_room_screen.dart';
+import '../../features/session/screens/widgets/create_session_dialog.dart';
+import '../../features/session/screens/widgets/session_data_source.dart';
+import '../../features/session/screens/widgets/session_detail_popup.dart';
 
 class CalendarDesktopScreen extends StatefulWidget {
   const CalendarDesktopScreen({super.key});
@@ -23,6 +33,9 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
   void initState() {
     super.initState();
     _calendarController.displayDate = _focusedDate;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSessionsForCurrentView();
+    });
   }
 
   @override
@@ -36,6 +49,7 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
       _focusedDate = DateTime.now();
       _calendarController.displayDate = _focusedDate;
     });
+    _loadSessionsForCurrentView();
   }
 
   void _navigateByWeek(int direction) {
@@ -43,50 +57,131 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
       _focusedDate = _focusedDate.add(Duration(days: 7 * direction));
       _calendarController.displayDate = _focusedDate;
     });
+    _loadSessionsForCurrentView();
+  }
+
+  void _loadSessionsForCurrentView() {
+    final DateTime monday = _focusedDate.subtract(
+      Duration(days: _focusedDate.weekday - 1),
+    );
+    final DateTime friday = monday.add(const Duration(days: 4));
+    context.read<SessionProvider>().loadSessionsForRange(monday, friday);
+  }
+
+  void _showSessionDetail(BuildContext ctx, SessionModel session) {
+    showDialog<void>(
+      context: ctx,
+      barrierColor: Colors.black.withOpacity(0.3),
+      builder: (_) => SessionDetailPopup(
+        session: session,
+        onJoin: () => _handleJoin(session),
+        onStart: (SessionModel started) => _handleStart(started),
+      ),
+    );
+  }
+
+  void _showCreateDialog(BuildContext ctx, {DateTime? prefilledDate}) {
+    showDialog<void>(
+      context: ctx,
+      barrierColor: Colors.black.withOpacity(0.3),
+      builder: (_) => CreateSessionDialog(prefilledDate: prefilledDate),
+    );
+  }
+
+  Future<void> _handleStart(SessionModel session) async {
+    final result =
+        await context.read<SessionProvider>().joinSession(session.id);
+    if (!mounted) return;
+
+    if (result == null) {
+      final String? error = context.read<SessionProvider>().errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Không thể vào buổi học.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChangeNotifierProvider(
+          create: (_) => MeetingRoomProvider(),
+          child: MeetingRoomScreen(
+            sessionId: session.id,
+            livekitUrl: result.livekitUrl,
+            token: result.token,
+            sessionTitle: session.title,
+            isTeacher: true,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleJoin(SessionModel session) async {
+    final result =
+        await context.read<SessionProvider>().joinSession(session.id);
+    if (!mounted) return;
+
+    if (result == null) {
+      final String? error = context.read<SessionProvider>().errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Không thể tham gia buổi học.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChangeNotifierProvider(
+          create: (_) => MeetingRoomProvider(),
+          child: MeetingRoomScreen(
+            sessionId: session.id,
+            livekitUrl: result.livekitUrl,
+            token: result.token,
+            sessionTitle: session.title,
+            isTeacher: false,
+          ),
+        ),
+      ),
+    );
   }
 
   String _buildDateRangeLabel() {
-    final start = _focusedDate.subtract(
+    final DateTime start = _focusedDate.subtract(
       Duration(days: _focusedDate.weekday - 1),
     );
-    final end = start.add(const Duration(days: 4));
-    const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+    final DateTime end = start.add(const Duration(days: 4));
+    const List<String> monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
     ];
 
-    final startMonth = monthNames[start.month - 1];
-    final endMonth = monthNames[end.month - 1];
+    final String startMonth = monthNames[start.month - 1];
+    final String endMonth = monthNames[end.month - 1];
 
     if (start.month == end.month) {
       return '$startMonth ${start.day} - ${end.day}, ${end.year}';
     }
-
     return '$startMonth ${start.day} - $endMonth ${end.day}, ${end.year}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final today = DateTime.now();
-    final highlightedDay =
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final SessionProvider sessionProvider = context.watch<SessionProvider>();
+    final bool isTeacher =
+        context.read<AuthNotifier>().currentUser?.role == 'teacher';
+
+    final DateTime today = DateTime.now();
+    final int highlightedDay =
         (today.year == _miniMonth.year && today.month == _miniMonth.month)
-        ? today.day
-        : 2;
+            ? today.day
+            : 2;
 
     return LayoutBuilder(
-      builder: (context, constraints) {
-        final hideSidebar = constraints.maxWidth < _hideSidebarThreshold;
+      builder: (BuildContext ctx, BoxConstraints constraints) {
+        final bool hideSidebar =
+            constraints.maxWidth < _hideSidebarThreshold;
 
         return Container(
           color: scheme.surface,
@@ -100,16 +195,11 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
                     highlightedDay: highlightedDay,
                     isExpanded: _isMyCalendarsExpanded,
                     isCalendarChecked: _isMainCalendarChecked,
-                    onToggleExpanded: () {
-                      setState(() {
-                        _isMyCalendarsExpanded = !_isMyCalendarsExpanded;
-                      });
-                    },
-                    onCalendarChanged: (checked) {
-                      setState(() {
-                        _isMainCalendarChecked = checked;
-                      });
-                    },
+                    onToggleExpanded: () => setState(
+                      () => _isMyCalendarsExpanded = !_isMyCalendarsExpanded,
+                    ),
+                    onCalendarChanged: (bool checked) =>
+                        setState(() => _isMainCalendarChecked = checked),
                   ),
                 ),
               Expanded(
@@ -132,16 +222,52 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
                         onTodayPressed: _goToToday,
                         onPreviousPressed: () => _navigateByWeek(-1),
                         onNextPressed: () => _navigateByWeek(1),
-                        onViewChanged: (view) {
-                          setState(() {
-                            _selectedView = view;
-                          });
-                        },
+                        onViewChanged: (String view) =>
+                            setState(() => _selectedView = view),
+                        showNewButton: isTeacher,
+                        onNewPressed: () => _showCreateDialog(context),
                       ),
                       Expanded(
-                        child: MainCalendarGrid(
-                          controller: _calendarController,
-                          focusedDate: _focusedDate,
+                        child: Stack(
+                          children: [
+                            MainCalendarGrid(
+                              controller: _calendarController,
+                              focusedDate: _focusedDate,
+                              dataSource: SessionDataSource(
+                                sessionProvider.sessions,
+                                scheme,
+                              ),
+                              onTap: (CalendarTapDetails details) {
+                                if (details.appointments?.isNotEmpty == true) {
+                                  final String id =
+                                      details.appointments!.first.id as String;
+                                  final SessionModel session =
+                                      sessionProvider.sessions.firstWhere(
+                                    (SessionModel s) => s.id == id,
+                                  );
+                                  _showSessionDetail(context, session);
+                                } else if (
+                                  details.targetElement ==
+                                      CalendarElement.calendarCell &&
+                                  isTeacher
+                                ) {
+                                  _showCreateDialog(
+                                    context,
+                                    prefilledDate: details.date,
+                                  );
+                                }
+                              },
+                            ),
+                            if (sessionProvider.isLoading)
+                              const Positioned.fill(
+                                child: ColoredBox(
+                                  color: Color(0x22000000),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -155,6 +281,8 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
 
 class CalendarSidebar extends StatelessWidget {
   const CalendarSidebar({
@@ -176,7 +304,7 @@ class CalendarSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
@@ -187,9 +315,9 @@ class CalendarSidebar extends StatelessWidget {
           Text(
             'Calendar',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface,
-            ),
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
           ),
           const SizedBox(height: 18),
           _MiniMonthCalendar(month: month, highlightedDay: highlightedDay),
@@ -210,9 +338,9 @@ class CalendarSidebar extends StatelessWidget {
                   Text(
                     'My calendars',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: scheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ],
               ),
@@ -221,15 +349,15 @@ class CalendarSidebar extends StatelessWidget {
           if (isExpanded)
             CheckboxListTile(
               value: isCalendarChecked,
-              onChanged: (value) => onCalendarChanged(value ?? false),
+              onChanged: (bool? value) => onCalendarChanged(value ?? false),
               controlAffinity: ListTileControlAffinity.leading,
               dense: true,
               contentPadding: const EdgeInsets.only(left: 2),
               title: Text(
                 'Calendar',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurface,
+                    ),
               ),
             ),
         ],
@@ -238,24 +366,29 @@ class CalendarSidebar extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+
 class _MiniMonthCalendar extends StatelessWidget {
-  const _MiniMonthCalendar({required this.month, required this.highlightedDay});
+  const _MiniMonthCalendar({
+    required this.month,
+    required this.highlightedDay,
+  });
 
   final DateTime month;
   final int highlightedDay;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final firstDayOffset = DateTime(month.year, month.month, 1).weekday - 1;
-    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    const weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final int firstDayOffset =
+        DateTime(month.year, month.month, 1).weekday - 1;
+    final int daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    const List<String> weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
-    final cells = <int?>[
+    final List<int?> cells = <int?>[
       ...List<int?>.filled(firstDayOffset, null),
-      ...List<int?>.generate(daysInMonth, (index) => index + 1),
+      ...List<int?>.generate(daysInMonth, (int i) => i + 1),
     ];
-
     while (cells.length % 7 != 0) {
       cells.add(null);
     }
@@ -274,22 +407,14 @@ class _MiniMonthCalendar extends StatelessWidget {
               Text(
                 'April 2026',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: scheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
               ),
               const Spacer(),
-              Icon(
-                Icons.chevron_left,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_left, size: 18, color: scheme.onSurfaceVariant),
               const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right, size: 18, color: scheme.onSurfaceVariant),
             ],
           ),
           const SizedBox(height: 10),
@@ -303,16 +428,14 @@ class _MiniMonthCalendar extends StatelessWidget {
               mainAxisSpacing: 4,
               childAspectRatio: 1.6,
             ),
-            itemBuilder: (context, index) {
-              return Center(
-                child: Text(
-                  weekDays[index],
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant.withOpacity(0.8),
-                  ),
-                ),
-              );
-            },
+            itemBuilder: (BuildContext context, int index) => Center(
+              child: Text(
+                weekDays[index],
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant.withOpacity(0.8),
+                    ),
+              ),
+            ),
           ),
           const SizedBox(height: 6),
           GridView.builder(
@@ -323,31 +446,28 @@ class _MiniMonthCalendar extends StatelessWidget {
               crossAxisCount: 7,
               crossAxisSpacing: 4,
               mainAxisSpacing: 4,
-              childAspectRatio: 1,
             ),
-            itemBuilder: (context, index) {
-              final day = cells[index];
-              if (day == null) {
-                return const SizedBox.shrink();
-              }
-
-              final isHighlighted = day == highlightedDay;
+            itemBuilder: (BuildContext context, int index) {
+              final int? day = cells[index];
+              if (day == null) return const SizedBox.shrink();
+              final bool isHighlighted = day == highlightedDay;
               return Container(
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isHighlighted ? scheme.primary : Colors.transparent,
+                  color:
+                      isHighlighted ? scheme.primary : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
                 child: Text(
                   '$day',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isHighlighted
-                        ? scheme.onPrimary
-                        : scheme.onSurfaceVariant.withOpacity(0.85),
-                    fontWeight: isHighlighted
-                        ? FontWeight.w700
-                        : FontWeight.w400,
-                  ),
+                        color: isHighlighted
+                            ? scheme.onPrimary
+                            : scheme.onSurfaceVariant.withOpacity(0.85),
+                        fontWeight: isHighlighted
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                      ),
                 ),
               );
             },
@@ -358,6 +478,9 @@ class _MiniMonthCalendar extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+
+/// Top bar của calendar — navigation, view picker, và nút "New" (teacher-only).
 class CalendarTopBar extends StatelessWidget {
   const CalendarTopBar({
     super.key,
@@ -367,6 +490,8 @@ class CalendarTopBar extends StatelessWidget {
     required this.onPreviousPressed,
     required this.onNextPressed,
     required this.onViewChanged,
+    required this.showNewButton,
+    required this.onNewPressed,
   });
 
   final String dateRangeText;
@@ -376,9 +501,15 @@ class CalendarTopBar extends StatelessWidget {
   final VoidCallback onNextPressed;
   final ValueChanged<String> onViewChanged;
 
+  /// Ẩn/hiện nút "New" — chỉ hiển thị với role `teacher`.
+  final bool showNewButton;
+
+  /// Callback khi teacher bấm "New".
+  final VoidCallback onNewPressed;
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
@@ -389,12 +520,12 @@ class CalendarTopBar extends StatelessWidget {
         ),
       ),
       child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final collapseFilterToIcon = width < 1180;
-          final collapseMeetToIcon = width < 1080;
-          final collapseNewToIcon = width < 980;
-          final moveWorkWeekAndFilterToMore = width < 920;
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double width = constraints.maxWidth;
+          final bool collapseFilterToIcon = width < 1180;
+          final bool collapseMeetToIcon = width < 1080;
+          final bool collapseNewToIcon = width < 980;
+          final bool moveWorkWeekAndFilterToMore = width < 920;
 
           final moreItems = <PopupMenuEntry<_CalendarMoreAction>>[
             if (moveWorkWeekAndFilterToMore)
@@ -457,19 +588,20 @@ class CalendarTopBar extends StatelessWidget {
                   dateRangeText,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: scheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ),
               const SizedBox(width: 10),
-              if (!moveWorkWeekAndFilterToMore)
+              if (!moveWorkWeekAndFilterToMore) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
                     color: scheme.surfaceContainerHighest.withOpacity(0.45),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: scheme.outline.withOpacity(0.2)),
+                    border:
+                        Border.all(color: scheme.outline.withOpacity(0.2)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -481,17 +613,14 @@ class CalendarTopBar extends StatelessWidget {
                           child: Text('Work week'),
                         ),
                       ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          onViewChanged(value);
-                        }
+                      onChanged: (String? value) {
+                        if (value != null) onViewChanged(value);
                       },
                     ),
                   ),
                 ),
-              if (!moveWorkWeekAndFilterToMore) const SizedBox(width: 8),
-              if (!moveWorkWeekAndFilterToMore)
-                (collapseFilterToIcon
+                const SizedBox(width: 8),
+                collapseFilterToIcon
                     ? IconButton(
                         onPressed: () {},
                         tooltip: 'Filter applied',
@@ -501,20 +630,22 @@ class CalendarTopBar extends StatelessWidget {
                         onPressed: () {},
                         icon: const Icon(Icons.filter_alt_outlined),
                         label: const Text('Filter applied'),
-                      )),
-              if (!moveWorkWeekAndFilterToMore) const SizedBox(width: 8),
+                      ),
+                const SizedBox(width: 8),
+              ],
               PopupMenuButton<_CalendarMoreAction>(
                 tooltip: 'More actions',
-                onSelected: (action) {
+                onSelected: (_CalendarMoreAction action) {
                   if (action == _CalendarMoreAction.workWeek) {
                     onViewChanged('Work week');
                   }
                 },
-                itemBuilder: (context) => moreItems,
+                itemBuilder: (BuildContext context) => moreItems,
                 icon: const Icon(Icons.more_horiz),
               ),
-              const SizedBox(width: 8),
-              (collapseMeetToIcon
+              if (showNewButton) ...[
+                const SizedBox(width: 8),
+                collapseMeetToIcon
                   ? IconButton(
                       onPressed: () {},
                       tooltip: 'Meet now',
@@ -524,19 +655,23 @@ class CalendarTopBar extends StatelessWidget {
                       onPressed: () {},
                       icon: const Icon(Icons.videocam_outlined),
                       label: const Text('Meet now'),
-                    )),
-              const SizedBox(width: 8),
-              (collapseNewToIcon
-                  ? IconButton(
-                      onPressed: () {},
-                      tooltip: 'New',
-                      icon: const Icon(Icons.calendar_today_outlined),
-                    )
-                  : FilledButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      label: const Text('New'),
-                    )),
+                    ),
+                const SizedBox(width: 8),
+                Semantics(
+                  label: 'Tạo buổi học mới',
+                  child: collapseNewToIcon
+                      ? IconButton(
+                          onPressed: onNewPressed,
+                          tooltip: 'Tạo mới',
+                          icon: const Icon(Icons.calendar_today_outlined),
+                        )
+                      : FilledButton.icon(
+                          onPressed: onNewPressed,
+                          icon: const Icon(Icons.calendar_today_outlined),
+                          label: const Text('New'),
+                        ),
+                ),
+              ],
             ],
           );
         },
@@ -547,19 +682,30 @@ class CalendarTopBar extends StatelessWidget {
 
 enum _CalendarMoreAction { workWeek, filterApplied, share, print }
 
+// ---------------------------------------------------------------------------
+
+/// Wrapper quanh [SfCalendar] với các defaults của ứng dụng.
 class MainCalendarGrid extends StatelessWidget {
   const MainCalendarGrid({
     super.key,
     required this.controller,
     required this.focusedDate,
+    this.dataSource,
+    this.onTap,
   });
 
   final CalendarController controller;
   final DateTime focusedDate;
 
+  /// Data source cung cấp các appointment session cho calendar.
+  final CalendarDataSource? dataSource;
+
+  /// Callback khi tap vào cell hoặc appointment.
+  final CalendarTapCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
 
     return SfCalendar(
       key: ValueKey(focusedDate.toIso8601String()),
@@ -578,12 +724,12 @@ class MainCalendarGrid extends StatelessWidget {
       viewHeaderStyle: ViewHeaderStyle(
         backgroundColor: scheme.surfaceContainerHighest.withOpacity(0.16),
         dateTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: scheme.onSurface,
-        ),
-        dayTextStyle: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
+        dayTextStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
       ),
       timeSlotViewSettings: TimeSlotViewSettings(
         dayFormat: 'EEEE',
@@ -591,9 +737,11 @@ class MainCalendarGrid extends StatelessWidget {
         timeFormat: 'h a',
         timeIntervalHeight: 62,
         timeTextStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: scheme.onSurfaceVariant.withOpacity(0.85),
-        ),
+              color: scheme.onSurfaceVariant.withOpacity(0.85),
+            ),
       ),
+      dataSource: dataSource,
+      onTap: onTap,
     );
   }
 }
