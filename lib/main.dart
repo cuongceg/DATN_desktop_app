@@ -18,6 +18,9 @@ import 'features/classroom/classroom_providers.dart';
 import 'features/classroom/presentation/controllers/classroom_notifier.dart';
 import 'services/api_client.dart';
 import 'services/auth_storage.dart';
+import 'features/session/data/session_api.dart';
+import 'features/session/data/session_repository.dart';
+import 'features/session/providers/session_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +52,11 @@ Future<void> main() async {
         ),
         ChangeNotifierProvider<ClassroomNotifier>(
           create: (_) => ClassroomProviders.createNotifier(apiClient.dio),
+        ),
+        ChangeNotifierProvider<SessionProvider>(
+          create: (_) => SessionProvider(
+            SessionRepository(SessionApi(apiClient.dio)),
+          ),
         ),
       ],
       child: EducationDesktopApp(

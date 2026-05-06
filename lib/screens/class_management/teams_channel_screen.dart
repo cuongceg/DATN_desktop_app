@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_web_rtc/screens/class_management/document_management_screen.dart';
-import 'package:flutter_web_rtc/screens/meeting/meeting_screen.dart';
 import 'package:flutter_web_rtc/widgets/post_card.dart';
 import 'package:flutter_web_rtc/widgets/message_composer.dart';
+import '../../features/session/screens/meeting_room_screen.dart';
+import '../../features/session/providers/meeting_room_provider.dart';
+import '../../features/session/providers/session_provider.dart';
 
 class TeamsChannelScreen extends StatefulWidget {
   const TeamsChannelScreen({
     super.key,
+    required this.classId,
     required this.initialTeam,
     required this.isTeacher,
     required this.currentThemeMode,
@@ -14,6 +18,8 @@ class TeamsChannelScreen extends StatefulWidget {
     this.availableTeams = const <String>[],
   });
 
+  /// UUID của lớp học — dùng để gọi API tạo/join session.
+  final String classId;
   final bool isTeacher;
   final String initialTeam;
   final List<String> availableTeams;
@@ -31,6 +37,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
   late String _selectedTeam;
   bool _isComposerVisible = false;
   bool _showNewPostIndicator = false;
+  bool _isMeetLoading = false;
   int? _editingPostIndex;
   String _composerInitialSubject = '';
   String _composerInitialBody = '';
@@ -288,6 +295,169 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
     });
   }
 
+  // ─── TASK-UI-20: classId hợp lệ từ widget (TASK-UI-20 đã done) ───────────────────────────
+
+  /// Trả về classId UUID thật từ widget.classId.
+  String _getCurrentClassId() => widget.classId;
+
+  Future<void> _handleMeetNow(BuildContext context) async {
+    setState(() => _isMeetLoading = true);
+    final sessionProvider = context.read<SessionProvider>();
+    final classId = _getCurrentClassId();
+
+    try {
+      // Bước 1: Tạo session mới
+      final session = await sessionProvider.createSession(classId, 'Buổi học nhanh');
+      if (session == null) {
+        if (context.mounted) _showError(context, sessionProvider.errorMessage ?? 'Không thể tạo buổi học');
+        return;
+      }
+
+      // Bước 2: Start session
+      await sessionProvider.startSession(session.id);
+
+      // Bước 3: Lấy token LiveKit
+      final joinData = await sessionProvider.joinSession(session.id);
+      if (joinData == null) {
+        if (context.mounted) _showError(context, sessionProvider.errorMessage ?? 'Không lấy được token');
+        return;
+      }
+
+      if (!context.mounted) return;
+
+      // Bước 4: Navigate vào MeetingRoomScreen
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChangeNotifierProvider(
+            create: (_) => MeetingRoomProvider(),
+            child: MeetingRoomScreen(
+              sessionId: session.id,
+              livekitUrl: joinData.livekitUrl,
+              token: joinData.token,
+              sessionTitle: session.title,
+              isTeacher: widget.isTeacher,
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isMeetLoading = false);
+    }
+  }
+
+  // ─── TASK-UI-16: Tạo cuộc họp sau ──────────────────────────────────────────
+
+  Future<void> _handleScheduleMeeting(BuildContext context) async {
+    final titleController = TextEditingController();
+    DateTime? selectedDateTime;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          title: const Text('Tạo cuộc họp sau'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Tiêu đề buổi học',
+                    hintText: 'VD: Buổi học toán lớp 10A',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  label: Text(
+                    selectedDateTime == null
+                        ? 'Chọn ngày và giờ'
+                        : '${selectedDateTime!.day.toString().padLeft(2, '0')}/${selectedDateTime!.month.toString().padLeft(2, '0')}/${selectedDateTime!.year}  ${selectedDateTime!.hour.toString().padLeft(2, '0')}:${selectedDateTime!.minute.toString().padLeft(2, '0')}',
+                  ),
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: ctx,
+                      initialDate: DateTime.now().add(const Duration(hours: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (date == null) return;
+                    if (!ctx.mounted) return;
+                    final time = await showTimePicker(
+                      context: ctx,
+                      initialTime: TimeOfDay.now(),
+                    );
+                    if (time == null) return;
+                    setStateDialog(() {
+                      selectedDateTime = DateTime(
+                        date.year, date.month, date.day,
+                        time.hour, time.minute,
+                      );
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text('Huỷ'),
+            ),
+            FilledButton(
+              onPressed: titleController.text.isEmpty || selectedDateTime == null
+                  ? null
+                  : () => Navigator.of(dialogCtx).pop(true),
+              child: const Text('Tạo lịch'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    if (titleController.text.isEmpty || selectedDateTime == null) return;
+
+    setState(() => _isMeetLoading = true);
+    final sessionProvider = context.read<SessionProvider>();
+    try {
+      final session = await sessionProvider.createSession(
+        _getCurrentClassId(),
+        titleController.text.trim(),
+      );
+      if (!context.mounted) return;
+      if (session == null) {
+        _showError(context, sessionProvider.errorMessage ?? 'Không thể tạo lịch');
+        return;
+      }
+      final dt = selectedDateTime!;
+      final formatted =
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} '
+          '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã lên lịch buổi học lúc $formatted'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isMeetLoading = false);
+    }
+  }
+
+  void _showError(BuildContext context, String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  // ─── AppBar ─────────────────────────────────────────────────────────────────
+
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
@@ -307,27 +477,68 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
         ],
       ),
       actions: [
-        OutlinedButton.icon(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MeetingScreen(isTeacher: widget.isTeacher),
-              ),
-            );
+        // ── Meet now dropdown (TASK-UI-16) ──
+        PopupMenuButton<String>(
+          offset: const Offset(0, 48),
+          enabled: !_isMeetLoading,
+          onSelected: (value) {
+            if (value == 'now') _handleMeetNow(context);
+            if (value == 'schedule') _handleScheduleMeeting(context);
           },
-          icon: const Icon(Icons.videocam_outlined, size: 20),
-          label: const Text('Meet now'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: colors.primary,
-            side: BorderSide(color: colors.outlineVariant),
-          ),
+          itemBuilder: (_) => [
+            const PopupMenuItem(
+              value: 'now',
+              child: ListTile(
+                leading: Icon(Icons.videocam_outlined),
+                title: Text('Meet now'),
+                subtitle: Text('Bắt đầu ngay lập tức'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'schedule',
+              child: ListTile(
+                leading: Icon(Icons.calendar_today_outlined),
+                title: Text('Tạo cuộc họp sau'),
+                subtitle: Text('Đặt lịch buổi học'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+          child: _isMeetLoading
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colors.primary,
+                    ),
+                  ),
+                )
+              : OutlinedButton.icon(
+                  // PopupMenuButton sẽ tự xử lý tap, onPressed = null
+                  onPressed: null,
+                  icon: const Icon(Icons.videocam_outlined, size: 20),
+                  label: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Meet now'),
+                      SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down, size: 16),
+                    ],
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colors.primary,
+                    side: BorderSide(color: colors.outlineVariant),
+                    // Disable visual agar nút nhìn vẫn enabled
+                    disabledForegroundColor: colors.primary.withOpacity(0.9),
+                    disabledIconColor: colors.primary.withOpacity(0.9),
+                  ),
+                ),
         ),
-        Icon(
-          Icons.keyboard_arrow_down,
-          size: 16,
-          color: colors.onSurfaceVariant,
-        ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 8),
         IconButton(icon: const Icon(Icons.search), onPressed: () {}),
         IconButton(
           icon: const Icon(Icons.call_to_action_outlined),

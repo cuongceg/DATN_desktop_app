@@ -47,6 +47,9 @@ dependencies:
   dio: ^5.8.0+1
   flutter_secure_storage: ^9.2.4
   lottie: ^3.3.3
+  # State management — required for AuthNotifier (REFACTOR-001)
+  provider: ^6.1.2
+  livekit_client: ^2.7.0
 
 dev_dependencies:
   flutter_test:
