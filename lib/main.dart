@@ -21,6 +21,7 @@ import 'services/auth_storage.dart';
 import 'features/session/data/session_api.dart';
 import 'features/session/data/session_repository.dart';
 import 'features/session/providers/session_provider.dart';
+import 'features/session/services/session_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +56,7 @@ Future<void> main() async {
         ),
         ChangeNotifierProvider<SessionProvider>(
           create: (_) => SessionProvider(
-            SessionRepository(SessionApi(apiClient.dio)),
+            SessionService(SessionRepository(SessionApi(apiClient.dio))),
           ),
         ),
       ],

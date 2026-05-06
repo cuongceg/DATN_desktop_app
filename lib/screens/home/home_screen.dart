@@ -6,7 +6,7 @@ import '../../models/class_details.dart';
 import '../../models/class_member.dart';
 import '../../models/class_notification.dart';
 import '../../models/user.dart';
-import '../calendar/calendar_screen.dart';
+import '../../features/calendar/screens/calendar_screen.dart';
 import '../../widgets/sidebar_navigation.dart';
 
 /// Root shell screen that owns the sidebar navigation and routes to the

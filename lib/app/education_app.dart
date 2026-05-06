@@ -14,7 +14,7 @@ import '../features/auth/presentation/screens/login_screen.dart';
 import '../services/api_client.dart';
 import '../services/api_service.dart';
 import '../services/auth_storage.dart';
-import '../theme/app_theme.dart';
+import '../core/theme/app_theme.dart';
 
 class EducationDesktopApp extends StatefulWidget {
   const EducationDesktopApp({
