@@ -66,17 +66,37 @@ class TeacherDashboardScreen extends StatefulWidget {
 
 class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   String _selectedFilter = 'All Classes';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<ClassroomNotifier>();
     final allClassrooms = notifier.classrooms;
 
+    final normalizedQuery = _searchQuery.trim().toLowerCase();
+
     final classrooms = allClassrooms.where((c) {
-      if (_selectedFilter == 'All Classes') return true;
-      final target = _selectedFilter.toLowerCase();
-      final status = (c.status ?? 'active').toLowerCase();
-      return status == target;
+      final statusMatches = () {
+        if (_selectedFilter == 'All Classes') return true;
+        final target = _selectedFilter.toLowerCase();
+        final status = (c.status ?? 'active').toLowerCase();
+        return status == target;
+      }();
+      if (!statusMatches) return false;
+
+      if (normalizedQuery.isEmpty) return true;
+
+      final name = c.name.toLowerCase();
+      final classCode = (c.classCode ?? '').toLowerCase();
+      return name.contains(normalizedQuery) ||
+          classCode.contains(normalizedQuery);
     }).toList();
 
     final availableTeams = allClassrooms
@@ -95,8 +115,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           children: [
             Expanded(
               child: SearchBar(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
                 leading: const Icon(Icons.search, color: AppColors.outline),
-                hintText: 'Search classes, students, or resources...',
+                hintText: 'Search classes by name or code',
                 hintStyle: WidgetStatePropertyAll(
                   AppTextStyles.bodyLarge.copyWith(color: AppColors.outline),
                 ),
@@ -210,7 +232,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         ),
         const SizedBox(height: AppSizes.xs),
         Text(
-          'You have ${classrooms.length} active classes for the 2026.2 semester.',
+          'You have ${classrooms.length} classes for the 2026.2 semester.',
           style: AppTextStyles.bodyLarge.copyWith(
             color: isLight
                 ? AppColors.onSurfaceVariant
@@ -271,6 +293,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     currentThemeMode: currentThemeMode,
                     onThemeToggle: onThemeToggle,
                     onEdit: (classroom) => _openEditScreen(context, classroom),
+                    onArchive: (classroom) =>
+                        _confirmArchive(context, classroom),
+                    onActivate: (classroom) =>
+                        _confirmActivate(context, classroom),
                     onDelete: (classroom) => _confirmDelete(context, classroom),
                   ),
           ),
@@ -395,6 +421,94 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       }
     }
   }
+
+  Future<void> _confirmArchive(
+    BuildContext context,
+    ClassroomEntity classroom,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Lưu trữ lớp học'),
+        content: Text(
+          'Bạn có chắc muốn lưu trữ "${classroom.name}"? Bạn có thể kích hoạt lại sau.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          Semantics(
+            label: 'Xác nhận lưu trữ lớp ${classroom.name}',
+            child: FilledButton.tonal(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Lưu trữ'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await context.read<ClassroomNotifier>().archiveClassroom(classroom.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"${classroom.name}" đã được lưu trữ.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _confirmActivate(
+    BuildContext context,
+    ClassroomEntity classroom,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Kích hoạt lớp học'),
+        content: Text('Bạn có muốn kích hoạt lại "${classroom.name}" không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy'),
+          ),
+          Semantics(
+            label: 'Xác nhận kích hoạt lớp ${classroom.name}',
+            child: FilledButton.tonal(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Kích hoạt'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await context.read<ClassroomNotifier>().activateClassroom(classroom.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"${classroom.name}" đã được kích hoạt.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -408,6 +522,8 @@ class _ClassroomGrid extends StatelessWidget {
     required this.currentThemeMode,
     required this.onThemeToggle,
     required this.onEdit,
+    required this.onArchive,
+    required this.onActivate,
     required this.onDelete,
   });
 
@@ -416,6 +532,8 @@ class _ClassroomGrid extends StatelessWidget {
   final ThemeMode currentThemeMode;
   final ValueChanged<ThemeMode> onThemeToggle;
   final void Function(ClassroomEntity) onEdit;
+  final void Function(ClassroomEntity) onArchive;
+  final void Function(ClassroomEntity) onActivate;
   final void Function(ClassroomEntity) onDelete;
 
   @override
@@ -435,6 +553,8 @@ class _ClassroomGrid extends StatelessWidget {
           classroom: classroom,
           onTap: () => _openClassroomChannel(context, classroom),
           onEdit: () => onEdit(classroom),
+          onArchive: () => onArchive(classroom),
+          onActivate: () => onActivate(classroom),
           onDelete: () => onDelete(classroom),
         );
       },

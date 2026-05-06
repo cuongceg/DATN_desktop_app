@@ -6,6 +6,27 @@ String _mapApiError(DioException e) {
   final serverMsg = (data is Map ? data['message'] as String? : null) ?? '';
   final status = e.response?.statusCode ?? 0;
 
+  // scheduling errors
+  if (serverMsg == 'from and to are required.') {
+    return 'Thiếu khoảng thời gian (from/to).';
+  }
+  if (serverMsg == 'from must be a valid ISO date.') {
+    return 'Thời gian bắt đầu không hợp lệ.';
+  }
+  if (serverMsg == 'to must be a valid ISO date.') {
+    return 'Thời gian kết thúc không hợp lệ.';
+  }
+  if (serverMsg == 'At least one field (title, scheduledAt) is required.') {
+    return 'Vui lòng nhập ít nhất tiêu đề hoặc thời gian dự kiến.';
+  }
+  if (serverMsg ==
+      'Cannot reschedule a session that is already ongoing or completed.') {
+    return 'Không thể cập nhật lịch cho buổi học đang diễn ra hoặc đã kết thúc.';
+  }
+  if (serverMsg == 'Only scheduled sessions can be deleted.') {
+    return 'Chỉ có thể xoá buổi học ở trạng thái đã lên lịch.';
+  }
+
   // joinSession specific errors (POST /sessions/:id/token)
   if (serverMsg == 'Session has not started yet.') {
     return 'Buổi học chưa bắt đầu.';
@@ -67,13 +88,76 @@ class SessionApi {
     }
   }
 
-  Future<Map<String, dynamic>> createSession(String classId, String title) async {
+  Future<Map<String, dynamic>> createSession(
+    String classId,
+    String title, {
+    DateTime? scheduledAt,
+    DateTime? scheduledEndAt,
+  }) async {
     try {
-      final response = await _dio.post('/api/sessions', data: {
-        'classId': classId,
-        'title': title,
-      });
+      final data = <String, dynamic>{'classId': classId, 'title': title};
+      if (scheduledAt != null) {
+        data['scheduledAt'] = scheduledAt.toUtc().toIso8601String();
+      }
+      if (scheduledEndAt != null) {
+        data['scheduledEndAt'] = scheduledEndAt.toUtc().toIso8601String();
+      }
+
+      final response = await _dio.post('/api/sessions', data: data);
       return response.data['session'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception(_mapApiError(e));
+    }
+  }
+
+  /// GET /api/sessions/my?from=ISO8601&to=ISO8601
+  Future<List<dynamic>> fetchMySessionsInRange({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/sessions/my',
+        queryParameters: {
+          'from': from.toUtc().toIso8601String(),
+          'to': to.toUtc().toIso8601String(),
+        },
+      );
+      return response.data['sessions'] as List<dynamic>;
+    } on DioException catch (e) {
+      throw Exception(_mapApiError(e));
+    }
+  }
+
+  /// PATCH /api/sessions/:sessionId
+  /// Body: { title?, scheduledAt? } (ít nhất 1 field)
+  Future<Map<String, dynamic>> updateSession(
+    String sessionId, {
+    String? title,
+    DateTime? scheduledAt,
+    DateTime? scheduledEndAt,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (title != null) data['title'] = title;
+      if (scheduledAt != null) {
+        data['scheduledAt'] = scheduledAt.toUtc().toIso8601String();
+      }
+      if (scheduledEndAt != null) {
+        data['scheduledEndAt'] = scheduledEndAt.toUtc().toIso8601String();
+      }
+
+      final response = await _dio.patch('/api/sessions/$sessionId', data: data);
+      return response.data['session'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception(_mapApiError(e));
+    }
+  }
+
+  /// DELETE /api/sessions/:sessionId
+  Future<void> deleteSession(String sessionId) async {
+    try {
+      await _dio.delete('/api/sessions/$sessionId');
     } on DioException catch (e) {
       throw Exception(_mapApiError(e));
     }
@@ -122,11 +206,15 @@ class SessionApi {
     }
   }
 
-  Future<Map<String, dynamic>> sendMessage(String sessionId, String content) async {
+  Future<Map<String, dynamic>> sendMessage(
+    String sessionId,
+    String content,
+  ) async {
     try {
-      final response = await _dio.post('/api/sessions/$sessionId/messages', data: {
-        'content': content,
-      });
+      final response = await _dio.post(
+        '/api/sessions/$sessionId/messages',
+        data: {'content': content},
+      );
       return response.data['message_data'] as Map<String, dynamic>;
     } on DioException catch (e) {
       throw Exception(_mapApiError(e));

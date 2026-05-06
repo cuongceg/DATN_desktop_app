@@ -17,7 +17,7 @@ class SessionDataSource extends CalendarDataSource {
         .map(
           (SessionModel s) => Appointment(
             startTime: s.displayTime!,
-            endTime: s.displayTime!.add(const Duration(hours: 1)),
+            endTime: s.displayEndTime ?? s.displayTime!.add(const Duration(hours: 1)),
             subject: s.title,
             notes: s.className ?? '',
             color: _colorForStatus(s.status, scheme),

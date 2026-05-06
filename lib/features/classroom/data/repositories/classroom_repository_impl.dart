@@ -86,6 +86,24 @@ class ClassroomRepositoryImpl implements ClassroomRepository {
   }
 
   @override
+  Future<ClassroomEntity> archiveClassroom(String id) async {
+    try {
+      return await _remote.archiveClassroom(id);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  @override
+  Future<ClassroomEntity> activateClassroom(String id) async {
+    try {
+      return await _remote.activateClassroom(id);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  @override
   Future<ClassroomEntity> joinClassroom(String classCode) async {
     try {
       return await _remote.joinClassroom(classCode);

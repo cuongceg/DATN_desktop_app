@@ -9,12 +9,53 @@ class SessionRepository {
 
   Future<List<SessionModel>> getSessionsByClass(String classId) async {
     final data = await _api.fetchSessions(classId);
-    return data.map((json) => SessionModel.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => SessionModel.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<SessionModel> createSession(String classId, String title) async {
-    final data = await _api.createSession(classId, title);
+  Future<SessionModel> createSession({
+    required String classId,
+    required String title,
+    DateTime? scheduledAt,
+    DateTime? scheduledEndAt,
+  }) async {
+    final data = await _api.createSession(
+      classId,
+      title,
+      scheduledAt: scheduledAt,
+      scheduledEndAt: scheduledEndAt,
+    );
     return SessionModel.fromJson(data);
+  }
+
+  Future<List<SessionModel>> getMySessionsInRange({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final data = await _api.fetchMySessionsInRange(from: from, to: to);
+    return data
+        .map((json) => SessionModel.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<SessionModel> updateSession({
+    required String sessionId,
+    String? title,
+    DateTime? scheduledAt,
+    DateTime? scheduledEndAt,
+  }) async {
+    final data = await _api.updateSession(
+      sessionId,
+      title: title,
+      scheduledAt: scheduledAt,
+      scheduledEndAt: scheduledEndAt,
+    );
+    return SessionModel.fromJson(data);
+  }
+
+  Future<void> deleteSession(String sessionId) {
+    return _api.deleteSession(sessionId);
   }
 
   Future<SessionModel> startSession(String sessionId) async {
@@ -27,7 +68,9 @@ class SessionRepository {
     return SessionModel.fromJson(data);
   }
 
-  Future<({String token, String livekitUrl, String roomName})> joinSession(String sessionId) async {
+  Future<({String token, String livekitUrl, String roomName})> joinSession(
+    String sessionId,
+  ) async {
     final data = await _api.joinSession(sessionId);
     return (
       token: data['token'] as String,
@@ -38,7 +81,9 @@ class SessionRepository {
 
   Future<List<MessageModel>> fetchMessages(String sessionId) async {
     final data = await _api.fetchMessages(sessionId);
-    return data.map((json) => MessageModel.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => MessageModel.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<MessageModel> sendMessage(String sessionId, String content) async {

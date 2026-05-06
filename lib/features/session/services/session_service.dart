@@ -29,24 +29,28 @@ class SessionService {
     required String classId,
     required String title,
     DateTime? scheduledAt,
+    DateTime? scheduledEndAt,
   }) {
     return _repo.createSession(
       classId: classId,
       title: title,
       scheduledAt: scheduledAt,
+      scheduledEndAt: scheduledEndAt,
     );
   }
 
-  /// Update title/scheduledAt của session.
+  /// Update title/scheduledAt/scheduledEndAt của session.
   Future<SessionModel> updateSession({
     required String sessionId,
     String? title,
     DateTime? scheduledAt,
+    DateTime? scheduledEndAt,
   }) {
     return _repo.updateSession(
       sessionId: sessionId,
       title: title,
       scheduledAt: scheduledAt,
+      scheduledEndAt: scheduledEndAt,
     );
   }
 

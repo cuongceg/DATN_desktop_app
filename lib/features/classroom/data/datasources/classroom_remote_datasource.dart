@@ -73,6 +73,30 @@ class ClassroomRemoteDatasource {
     await _dio.delete<Map<String, dynamic>>('/api/classes/$id');
   }
 
+  /// Archives a classroom (active → archived).
+  ///
+  /// Endpoint: `PATCH /api/classes/{id}/archive`
+  Future<ClassroomModel> archiveClassroom(String id) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/api/classes/$id/archive',
+    );
+    final classJson =
+        response.data?['class'] as Map<String, dynamic>? ?? const {};
+    return ClassroomModel.fromJson(classJson);
+  }
+
+  /// Activates a classroom (archived → active).
+  ///
+  /// Endpoint: `PATCH /api/classes/{id}/activate`
+  Future<ClassroomModel> activateClassroom(String id) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/api/classes/$id/activate',
+    );
+    final classJson =
+        response.data?['class'] as Map<String, dynamic>? ?? const {};
+    return ClassroomModel.fromJson(classJson);
+  }
+
   /// Joins a classroom using an invite code.
   ///
   /// Endpoint: `POST /api/classes/join`

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/classroom_entity.dart';
+import '../../domain/usecases/activate_classroom_usecase.dart';
+import '../../domain/usecases/archive_classroom_usecase.dart';
 import '../../domain/usecases/create_classroom_usecase.dart';
 import '../../domain/usecases/delete_classroom_usecase.dart';
 import '../../domain/usecases/get_classrooms_usecase.dart';
@@ -21,17 +23,23 @@ class ClassroomNotifier extends ChangeNotifier {
     required CreateClassroomUseCase createClassroomUseCase,
     required UpdateClassroomUseCase updateClassroomUseCase,
     required DeleteClassroomUseCase deleteClassroomUseCase,
+    required ArchiveClassroomUseCase archiveClassroomUseCase,
+    required ActivateClassroomUseCase activateClassroomUseCase,
     required JoinClassroomUseCase joinClassroomUseCase,
   }) : _getClassrooms = getClassroomsUseCase,
        _createClassroom = createClassroomUseCase,
        _updateClassroom = updateClassroomUseCase,
        _deleteClassroom = deleteClassroomUseCase,
+       _archiveClassroom = archiveClassroomUseCase,
+       _activateClassroom = activateClassroomUseCase,
        _joinClassroom = joinClassroomUseCase;
 
   final GetClassroomsUseCase _getClassrooms;
   final CreateClassroomUseCase _createClassroom;
   final UpdateClassroomUseCase _updateClassroom;
   final DeleteClassroomUseCase _deleteClassroom;
+  final ArchiveClassroomUseCase _archiveClassroom;
+  final ActivateClassroomUseCase _activateClassroom;
   final JoinClassroomUseCase _joinClassroom;
 
   List<ClassroomEntity> _classrooms = const [];
@@ -115,6 +123,30 @@ class ClassroomNotifier extends ChangeNotifier {
         .where((item) => item.id != classroomId)
         .toList(growable: false);
     notifyListeners();
+  }
+
+  /// Archives a classroom (active → archived) and updates it in place.
+  ///
+  /// Throws on failure so the UI can show an error snackbar.
+  Future<ClassroomEntity> archiveClassroom(String classroomId) async {
+    final updated = await _archiveClassroom(classroomId);
+    _classrooms = _classrooms
+        .map((item) => item.id == updated.id ? updated : item)
+        .toList(growable: false);
+    notifyListeners();
+    return updated;
+  }
+
+  /// Activates a classroom (archived → active) and updates it in place.
+  ///
+  /// Throws on failure so the UI can show an error snackbar.
+  Future<ClassroomEntity> activateClassroom(String classroomId) async {
+    final updated = await _activateClassroom(classroomId);
+    _classrooms = _classrooms
+        .map((item) => item.id == updated.id ? updated : item)
+        .toList(growable: false);
+    notifyListeners();
+    return updated;
   }
 
   /// Joins a classroom using [classCode] and appends it to the list if new.

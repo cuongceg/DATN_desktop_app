@@ -136,7 +136,7 @@ class ClassroomCardWidget extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSizes.sm),
                         Text(
-                          'ROOM ${classroom.id.substring(0, 3).toUpperCase()} • ${classroom.studentCount} STUDENTS',
+                          '${classroom.studentCount ?? 0} STUDENTS',
                           style: AppTextStyles.labelCaps.copyWith(
                             color: isLight ? AppColors.onSurfaceVariant : AppColors.outlineVariant,
                           ),

@@ -29,13 +29,21 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
   final TextEditingController _titleController = TextEditingController();
   ClassroomEntity? _selectedClass;
   DateTime? _scheduledAt;
+  DateTime? _scheduledEndAt;
   bool _isSaving = false;
 
   bool get _isEditMode => widget.session != null;
 
+  /// `true` khi cả hai picker đều có giá trị nhưng end <= start.
+  bool get _endTimeIsInvalid =>
+      _scheduledAt != null &&
+      _scheduledEndAt != null &&
+      !_scheduledEndAt!.isAfter(_scheduledAt!);
+
   bool get _canSave =>
       _titleController.text.trim().isNotEmpty &&
-      (_isEditMode || _selectedClass != null);
+      (_isEditMode || _selectedClass != null) &&
+      !_endTimeIsInvalid;
 
   @override
   void initState() {
@@ -43,8 +51,12 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
     if (_isEditMode) {
       _titleController.text = widget.session!.title;
       _scheduledAt = widget.session!.scheduledAt;
+      _scheduledEndAt = widget.session!.scheduledEndAt;
     } else {
       _scheduledAt = widget.prefilledDate;
+      if (_scheduledAt != null) {
+        _scheduledEndAt = _scheduledAt!.add(const Duration(hours: 1));
+      }
     }
   }
 
@@ -54,7 +66,9 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
     super.dispose();
   }
 
-  Future<void> _pickDateTime() async {
+  // ── Pickers ───────────────────────────────────────────────────────────────
+
+  Future<void> _pickStartDateTime() async {
     final DateTime initial = _scheduledAt ?? DateTime.now();
     final DateTime? date = await showDatePicker(
       context: context,
@@ -72,14 +86,41 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
 
     setState(() {
       _scheduledAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
+        date.year, date.month, date.day, time.hour, time.minute,
+      );
+      // Auto-fill end time if unset or no longer after new start.
+      if (_scheduledEndAt == null ||
+          !_scheduledEndAt!.isAfter(_scheduledAt!)) {
+        _scheduledEndAt = _scheduledAt!.add(const Duration(hours: 1));
+      }
+    });
+  }
+
+  Future<void> _pickEndDateTime() async {
+    final DateTime initial =
+        _scheduledEndAt ?? _scheduledAt!.add(const Duration(hours: 1));
+    final DateTime? date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (date == null || !mounted) return;
+
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+
+    setState(() {
+      _scheduledEndAt = DateTime(
+        date.year, date.month, date.day, time.hour, time.minute,
       );
     });
   }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
     if (!_canSave) return;
@@ -93,12 +134,14 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
         sessionId: widget.session!.id,
         title: _titleController.text.trim(),
         scheduledAt: _scheduledAt?.toUtc(),
+        scheduledEndAt: _scheduledEndAt?.toUtc(),
       );
     } else {
       final SessionModel? created = await provider.createSession(
         _selectedClass!.id,
         _titleController.text.trim(),
         scheduledAt: _scheduledAt?.toUtc(),
+        scheduledEndAt: _scheduledEndAt?.toUtc(),
       );
       success = created != null;
     }
@@ -117,6 +160,8 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
     setState(() => _isSaving = false);
     if (ok) Navigator.of(context).pop();
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -151,7 +196,11 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
                   ],
                   _buildTitleField(scheme),
                   const SizedBox(height: 16),
-                  _buildDateTimePicker(scheme),
+                  _buildStartTimePicker(scheme),
+                  if (_scheduledAt != null) ...[
+                    const SizedBox(height: 12),
+                    _buildEndTimePicker(scheme),
+                  ],
                   const SizedBox(height: 24),
                   _buildActions(scheme),
                 ],
@@ -177,8 +226,6 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
     ColorScheme scheme,
     List<ClassroomEntity> classrooms,
   ) {
-    // Use DropdownButton + InputDecorator instead of DropdownButtonFormField
-    // to avoid the deprecated .value setter on FormField.
     return Semantics(
       label: 'Chọn lớp học',
       child: InputDecorator(
@@ -229,16 +276,16 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
     );
   }
 
-  Widget _buildDateTimePicker(ColorScheme scheme) {
+  Widget _buildStartTimePicker(ColorScheme scheme) {
     return Semantics(
-      label: 'Chọn thời gian dự kiến',
+      label: 'Chọn thời gian bắt đầu',
       button: true,
       child: InkWell(
-        onTap: _pickDateTime,
+        onTap: _pickStartDateTime,
         borderRadius: BorderRadius.circular(10),
         child: InputDecorator(
           decoration: InputDecoration(
-            labelText: 'Thời gian dự kiến (tuỳ chọn)',
+            labelText: 'Thời gian bắt đầu (tuỳ chọn)',
             filled: true,
             fillColor: scheme.surface.withValues(alpha: 0.5),
             border: OutlineInputBorder(
@@ -246,10 +293,13 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
             ),
             suffixIcon: _scheduledAt != null
                 ? Semantics(
-                    label: 'Xoá thời gian đã chọn',
+                    label: 'Xoá thời gian bắt đầu',
                     child: IconButton(
                       icon: const Icon(Icons.clear),
-                      onPressed: () => setState(() => _scheduledAt = null),
+                      onPressed: () => setState(() {
+                        _scheduledAt = null;
+                        _scheduledEndAt = null;
+                      }),
                     ),
                   )
                 : const Icon(Icons.schedule_outlined),
@@ -262,6 +312,53 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
                   fontSize: 16,
                   color: _scheduledAt != null
                       ? scheme.onSurface
+                      : scheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEndTimePicker(ColorScheme scheme) {
+    return Semantics(
+      label: 'Chọn thời gian kết thúc',
+      button: true,
+      child: InkWell(
+        onTap: _pickEndDateTime,
+        borderRadius: BorderRadius.circular(10),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'Thời gian kết thúc (tuỳ chọn)',
+            filled: true,
+            fillColor: scheme.surface.withValues(alpha: 0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            errorText: _endTimeIsInvalid
+                ? 'Giờ kết thúc phải sau giờ bắt đầu'
+                : null,
+            suffixIcon: _scheduledEndAt != null
+                ? Semantics(
+                    label: 'Xoá thời gian kết thúc',
+                    child: IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () =>
+                          setState(() => _scheduledEndAt = null),
+                    ),
+                  )
+                : const Icon(Icons.schedule_outlined),
+          ),
+          child: Text(
+            _scheduledEndAt != null
+                ? _formatDateTime(_scheduledEndAt!)
+                : 'Chưa đặt',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 16,
+                  color: _scheduledEndAt != null
+                      ? (_endTimeIsInvalid
+                          ? scheme.error
+                          : scheme.onSurface)
                       : scheme.onSurfaceVariant,
                 ),
           ),

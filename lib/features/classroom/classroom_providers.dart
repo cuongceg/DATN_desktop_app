@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 
 import 'data/datasources/classroom_remote_datasource.dart';
 import 'data/repositories/classroom_repository_impl.dart';
+import 'domain/usecases/activate_classroom_usecase.dart';
+import 'domain/usecases/archive_classroom_usecase.dart';
 import 'domain/usecases/create_classroom_usecase.dart';
 import 'domain/usecases/delete_classroom_usecase.dart';
 import 'domain/usecases/get_classrooms_usecase.dart';
@@ -24,6 +26,8 @@ abstract class ClassroomProviders {
       createClassroomUseCase: CreateClassroomUseCase(repo),
       updateClassroomUseCase: UpdateClassroomUseCase(repo),
       deleteClassroomUseCase: DeleteClassroomUseCase(repo),
+      archiveClassroomUseCase: ArchiveClassroomUseCase(repo),
+      activateClassroomUseCase: ActivateClassroomUseCase(repo),
       joinClassroomUseCase: JoinClassroomUseCase(repo),
     );
   }

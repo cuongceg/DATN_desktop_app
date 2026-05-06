@@ -13,6 +13,8 @@ class TeacherClassroomCardWidget extends StatelessWidget {
     required this.classroom,
     required this.onTap,
     required this.onEdit,
+    required this.onArchive,
+    required this.onActivate,
     required this.onDelete,
   });
 
@@ -25,11 +27,20 @@ class TeacherClassroomCardWidget extends StatelessWidget {
   /// Called when the teacher selects "Edit".
   final VoidCallback onEdit;
 
+  /// Called when the teacher selects "Archive".
+  final VoidCallback onArchive;
+
+  /// Called when the teacher selects "Activate".
+  final VoidCallback onActivate;
+
   /// Called when the teacher selects "Delete".
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final status = (classroom.status ?? 'active').toLowerCase();
+    final isArchived = status == 'archived';
+
     return ClassroomCardWidget(
       classroom: classroom,
       onTap: onTap,
@@ -41,28 +52,63 @@ class TeacherClassroomCardWidget extends StatelessWidget {
             switch (action) {
               case _Action.edit:
                 onEdit();
+              case _Action.archive:
+                onArchive();
+              case _Action.activate:
+                onActivate();
               case _Action.delete:
                 onDelete();
             }
           },
-          itemBuilder: (context) => const [
-            PopupMenuItem<_Action>(
-              value: _Action.edit,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.edit_outlined),
-                title: Text('Chỉnh sửa'),
+          itemBuilder: (context) {
+            if (isArchived) {
+              return const [
+                PopupMenuItem<_Action>(
+                  value: _Action.activate,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.play_circle_outline),
+                    title: Text('Kích hoạt lớp'),
+                  ),
+                ),
+                PopupMenuItem<_Action>(
+                  value: _Action.delete,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.delete_outline),
+                    title: Text('Xóa lớp'),
+                  ),
+                ),
+              ];
+            }
+
+            return const [
+              PopupMenuItem<_Action>(
+                value: _Action.edit,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Chỉnh sửa'),
+                ),
               ),
-            ),
-            PopupMenuItem<_Action>(
-              value: _Action.delete,
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.delete_outline),
-                title: Text('Xóa lớp'),
+              PopupMenuItem<_Action>(
+                value: _Action.archive,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.archive_outlined),
+                  title: Text('Lưu trữ lớp'),
+                ),
               ),
-            ),
-          ],
+              PopupMenuItem<_Action>(
+                value: _Action.delete,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Xóa lớp'),
+                ),
+              ),
+            ];
+          },
           icon: const Icon(Icons.more_vert),
         ),
       ),
@@ -70,4 +116,4 @@ class TeacherClassroomCardWidget extends StatelessWidget {
   }
 }
 
-enum _Action { edit, delete }
+enum _Action { edit, archive, activate, delete }

@@ -34,6 +34,16 @@ abstract interface class ClassroomRepository {
   /// Teacher-only operation.
   Future<void> deleteClassroom(String id);
 
+  /// Archives a classroom (active → archived).
+  ///
+  /// Teacher-only operation.
+  Future<ClassroomEntity> archiveClassroom(String id);
+
+  /// Activates a classroom (archived → active).
+  ///
+  /// Teacher-only operation.
+  Future<ClassroomEntity> activateClassroom(String id);
+
   /// Joins a classroom using the invite [classCode].
   ///
   /// Student-only operation. Returns the joined [ClassroomEntity].
