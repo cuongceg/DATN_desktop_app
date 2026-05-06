@@ -33,6 +33,7 @@ class ClassCardStudent extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => TeamsChannelScreen(
+              classId: classroom.id,
               initialTeam: classroom.name,
               availableTeams: availableTeams,
               isTeacher: false,
