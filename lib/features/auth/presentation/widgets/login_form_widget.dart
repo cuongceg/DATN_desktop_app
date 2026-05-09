@@ -164,8 +164,7 @@ class _LoginFormWidgetState extends State<LoginFormWidget> {
                 suffixIcon: IconButton(
                   onPressed: () =>
                       setState(() => _obscurePassword = !_obscurePassword),
-                  tooltip:
-                      _obscurePassword ? 'Show password' : 'Hide password',
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_off_outlined
@@ -328,7 +327,7 @@ class _RoleSelector extends StatelessWidget {
       segments: const [
         ButtonSegment<UserRole>(
           value: UserRole.teacher,
-          label: Text('Professor'),
+          label: Text('Teacher'),
         ),
         ButtonSegment<UserRole>(
           value: UserRole.student,
@@ -344,7 +343,9 @@ class _RoleSelector extends StatelessWidget {
         selectedForegroundColor: AppColors.primary,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-        textStyle: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+        textStyle: AppTextStyles.bodyLarge.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSizes.radiusFull),
         ),
@@ -402,10 +403,9 @@ class _GradientButton extends StatelessWidget {
                       label,
                       style: AppTextStyles.bodyLarge.copyWith(
                         color: onPressed == null
-                            ? Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.38)
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.38)
                             : AppColors.onPrimary,
                         fontWeight: FontWeight.w600,
                       ),

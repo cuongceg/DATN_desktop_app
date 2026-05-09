@@ -20,8 +20,9 @@ abstract class AuthLocalDataSource {
 class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   const AuthLocalDataSourceImpl(this._storage);
 
-  static const _tokenKey = 'auth_token';
-  static const _userKey = 'auth_user';
+  static const _flavor = String.fromEnvironment('APP_FLAVOR');
+  static final _tokenKey = _flavor.isEmpty ? 'auth_token' : 'auth_token_$_flavor';
+  static final _userKey = _flavor.isEmpty ? 'auth_user' : 'auth_user_$_flavor';
   static const _androidOptions = AndroidOptions(
     encryptedSharedPreferences: true,
   );

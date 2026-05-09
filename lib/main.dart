@@ -22,10 +22,12 @@ import 'features/session/data/session_api.dart';
 import 'features/session/data/session_repository.dart';
 import 'features/session/providers/session_provider.dart';
 import 'features/session/services/session_service.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  tz.initializeTimeZones();
+  _suppressKnownWebRtcErrors();
   await _configureDesktopWindow();
 
   // --- Dependency wiring ---
@@ -68,7 +70,27 @@ Future<void> main() async {
   );
 }
 
+// Suppresses PlatformException("No active stream to cancel") thrown by the
+// flutter_webrtc EventChannel when the native RTCPeerConnection is closed
+// before the Dart-side subscription cancel message reaches the platform.
+void _suppressKnownWebRtcErrors() {
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final exception = details.exception;
+    if (exception is PlatformException &&
+        (exception.message?.contains('No active stream to cancel') ?? false)) {
+      return;
+    }
+    if (originalOnError != null) {
+      originalOnError(details);
+    } else {
+      FlutterError.presentError(details);
+    }
+  };
+}
+
 Future<void> _configureDesktopWindow() async {
+  const _flavor = String.fromEnvironment('APP_FLAVOR');
   if (!(Platform.isLinux || Platform.isWindows || Platform.isMacOS)) {
     return;
   }
@@ -80,7 +102,9 @@ Future<void> _configureDesktopWindow() async {
       minimumSize: minWindowSize,
       size: Size(1360, 860),
       center: true,
-      title: 'Education Desktop UI',
+      title: _flavor == ''
+          ? 'Education Desktop UI'
+          : 'Education Desktop UI $_flavor',
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
