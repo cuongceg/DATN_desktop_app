@@ -6,8 +6,7 @@ import '../providers/session_provider.dart';
 import '../models/session_model.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/theme/glass_theme.dart';
-import 'meeting_room_screen.dart';
-import '../providers/meeting_room_provider.dart';
+import 'join_screen.dart';
 
 class SessionDetailScreen extends StatelessWidget {
   final String sessionId;
@@ -76,15 +75,12 @@ class SessionDetailScreen extends StatelessWidget {
                               );
                               return;
                             }
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider(
-                              create: (_) => MeetingRoomProvider(),
-                              child: MeetingRoomScreen(
-                                sessionId: session.id,
-                                livekitUrl: joinData.livekitUrl,
-                                token: joinData.token,
-                                sessionTitle: session.title,
-                                isTeacher: true,
-                              ),
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => JoinScreen(
+                              sessionId: session.id,
+                              livekitUrl: joinData.livekitUrl,
+                              token: joinData.token,
+                              sessionTitle: session.title,
+                              isTeacher: true,
                             )));
                           },
                           child: const Text('Bắt đầu buổi học', style: TextStyle(color: Colors.white)),
@@ -101,15 +97,12 @@ class SessionDetailScreen extends StatelessWidget {
                               );
                               return;
                             }
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider(
-                              create: (_) => MeetingRoomProvider(),
-                              child: MeetingRoomScreen(
-                                sessionId: session.id,
-                                livekitUrl: joinData.livekitUrl,
-                                token: joinData.token,
-                                sessionTitle: session.title,
-                                isTeacher: true,
-                              ),
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => JoinScreen(
+                              sessionId: session.id,
+                              livekitUrl: joinData.livekitUrl,
+                              token: joinData.token,
+                              sessionTitle: session.title,
+                              isTeacher: true,
                             )));
                           },
                           child: const Text('Vào phòng', style: TextStyle(color: Colors.white)),
@@ -134,15 +127,12 @@ class SessionDetailScreen extends StatelessWidget {
                               );
                               return;
                             }
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider(
-                              create: (_) => MeetingRoomProvider(),
-                              child: MeetingRoomScreen(
-                                sessionId: session.id,
-                                livekitUrl: joinData.livekitUrl,
-                                token: joinData.token,
-                                sessionTitle: session.title,
-                                isTeacher: false,
-                              ),
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => JoinScreen(
+                              sessionId: session.id,
+                              livekitUrl: joinData.livekitUrl,
+                              token: joinData.token,
+                              sessionTitle: session.title,
+                              isTeacher: false,
                             )));
                           },
                           child: const Text('Tham gia', style: TextStyle(color: Colors.white)),

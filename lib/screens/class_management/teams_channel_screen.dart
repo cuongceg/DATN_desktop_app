@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_web_rtc/screens/class_management/document_management_screen.dart';
 import 'package:flutter_web_rtc/widgets/post_card.dart';
 import 'package:flutter_web_rtc/widgets/message_composer.dart';
-import '../../features/session/screens/meeting_room_screen.dart';
-import '../../features/session/providers/meeting_room_provider.dart';
+import '../../features/session/screens/join_screen.dart';
 import '../../features/session/providers/session_provider.dart';
 
 class TeamsChannelScreen extends StatefulWidget {
@@ -325,18 +324,15 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
 
       if (!context.mounted) return;
 
-      // Bước 4: Navigate vào MeetingRoomScreen
+      // Bước 4: Navigate vào JoinScreen
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => ChangeNotifierProvider(
-            create: (_) => MeetingRoomProvider(),
-            child: MeetingRoomScreen(
-              sessionId: session.id,
-              livekitUrl: joinData.livekitUrl,
-              token: joinData.token,
-              sessionTitle: session.title,
-              isTeacher: widget.isTeacher,
-            ),
+          builder: (_) => JoinScreen(
+            sessionId: session.id,
+            livekitUrl: joinData.livekitUrl,
+            token: joinData.token,
+            sessionTitle: session.title,
+            isTeacher: widget.isTeacher,
           ),
         ),
       );

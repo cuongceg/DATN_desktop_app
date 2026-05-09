@@ -336,7 +336,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       status: classroom.status,
     );
 
-    final updated = await Navigator.of(context).push<ClassModel>(
+    final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => EditClassScreen(
           initialClass: classModel,
@@ -370,9 +370,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       ),
     );
 
-    if (updated != null && context.mounted) {
+    if (updated == true && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${updated.name} đã được cập nhật.')),
+        const SnackBar(content: Text('Lớp học đã được cập nhật.')),
       );
     }
   }

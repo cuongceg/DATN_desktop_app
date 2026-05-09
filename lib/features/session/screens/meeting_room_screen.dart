@@ -10,16 +10,12 @@ import 'widgets/participants_panel.dart';
 
 class MeetingRoomScreen extends StatefulWidget {
   final String sessionId;
-  final String livekitUrl;
-  final String token;
   final String sessionTitle;
   final bool isTeacher;
 
   const MeetingRoomScreen({
     super.key,
     required this.sessionId,
-    required this.livekitUrl,
-    required this.token,
     this.sessionTitle = 'Phòng học trực tuyến',
     this.isTeacher = false,
   });
@@ -29,57 +25,31 @@ class MeetingRoomScreen extends StatefulWidget {
 }
 
 class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
-  bool _isConnecting = true;
-  String? _error;
-
   @override
   void initState() {
     super.initState();
-    _connectToRoom();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<MeetingRoomProvider>().onDisconnected = () {
+        if (mounted) {
+          Navigator.popUntil(context, (route) => route.isFirst);
+        }
+      };
+    });
   }
 
-  Future<void> _connectToRoom() async {
+  Future<void> _stopScreenShare() async {
+    final p = context.read<MeetingRoomProvider>();
     try {
-      await context.read<MeetingRoomProvider>().connect(
-        widget.livekitUrl,
-        widget.token,
-      );
-      if (mounted) setState(() => _isConnecting = false);
+      await p.room?.localParticipant?.setScreenShareEnabled(false);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isConnecting = false;
-          _error = e.toString();
-        });
-      }
+      debugPrint('[MeetingRoom] stopScreenShare setScreenShareEnabled: $e');
     }
+    await p.stopScreenShare();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isConnecting) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Lỗi kết nối: $_error',
-                style: const TextStyle(color: Colors.red),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Quay lại'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
           ? GlassTheme.darkBackground
@@ -147,6 +117,12 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
                       Expanded(
                         child: ParticipantGrid(
                           participants: provider.participants,
+                          localParticipantSid:
+                              provider.room?.localParticipant?.sid,
+                          isLocalCamStarting:
+                              provider.isCamBusy && provider.isCamOn,
+                          screenShareTrack: provider.screenShareTrack,
+                          onStopScreenShare: _stopScreenShare,
                         ),
                       ),
                       if (provider.isChatOpen) ...[

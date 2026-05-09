@@ -1,4 +1,11 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
+import 'package:livekit_client/livekit_client.dart';
+// ignore: depend_on_referenced_packages
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
 import '../../providers/meeting_room_provider.dart';
 import '../../providers/session_provider.dart';
@@ -31,7 +38,7 @@ class BottomToolbar extends StatelessWidget {
               label: provider.isMicOn ? 'Tắt Mic' : 'Bật Mic',
               onTap: provider.toggleMic,
               isActive: provider.isMicOn,
-              activeColor: provider.isMicOn ? Colors.white : Colors.red,
+              inactiveColor: Colors.red,
             ),
             const SizedBox(width: 16),
             _ToolbarButton(
@@ -39,7 +46,19 @@ class BottomToolbar extends StatelessWidget {
               label: provider.isCamOn ? 'Tắt Cam' : 'Bật Cam',
               onTap: provider.toggleCam,
               isActive: provider.isCamOn,
-              activeColor: provider.isCamOn ? Colors.white : Colors.red,
+              inactiveColor: Colors.red,
+            ),
+            const SizedBox(width: 16),
+            _ToolbarButton(
+              icon: provider.isScreenShareOn
+                  ? Icons.stop_screen_share
+                  : Icons.screen_share,
+              label: provider.isScreenShareOn ? 'Dừng chia sẻ' : 'Chia sẻ màn hình',
+              onTap: provider.isScreenShareOn
+                  ? () => _disableScreenShare(context, provider)
+                  : () => _handleScreenShare(context, provider),
+              isActive: provider.isScreenShareOn,
+              activeColor: GlassTheme.accent,
             ),
             const SizedBox(width: 16),
             _ToolbarButton(
@@ -68,6 +87,93 @@ class BottomToolbar extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _handleScreenShare(
+    BuildContext context, MeetingRoomProvider provider) async {
+  if (provider.room?.localParticipant == null) return;
+
+  // ── Wayland-only guard (Linux only) ────────────────────────────────────────
+  if (!kIsWeb && Platform.isLinux) {
+    final waylandDisplay = Platform.environment['WAYLAND_DISPLAY'];
+    final x11Display = Platform.environment['DISPLAY'];
+    if (waylandDisplay != null && x11Display == null) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Cảnh báo Wayland'),
+          content: const Text(
+            'Bạn đang chạy trên Wayland thuần túy (không có X11).\n'
+            'Chia sẻ màn hình có thể không hoạt động hoặc '
+            'hiển thị màn hình trống.\n\n'
+            'Bạn có muốn thử không?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Huỷ'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Thử'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+  }
+
+  // ── Source picker + capture ─────────────────────────────────────────────────
+  try {
+    if (lkPlatformIsDesktop()) {
+      final source = await showDialog<DesktopCapturerSource>(
+        context: context,
+        builder: (ctx) => ScreenSelectDialog(),
+      );
+      if (source == null) return;
+      final track = await LocalVideoTrack.createScreenShareTrack(
+        ScreenShareCaptureOptions(sourceId: source.id, maxFrameRate: 15.0),
+      );
+      await provider.room!.localParticipant!.publishVideoTrack(track);
+      provider.startScreenShare(track);
+    } else {
+      await provider.room!.localParticipant!
+          .setScreenShareEnabled(true, captureScreenAudio: true);
+    }
+  } on PlatformException catch (e) {
+    debugPrint('Screen share PlatformException: ${e.code} — ${e.message}');
+    if (context.mounted) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Lỗi chia sẻ màn hình'),
+          content: Text(
+            'Không thể chia sẻ màn hình.\n'
+            'Lỗi: ${e.message ?? e.code}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  } catch (e) {
+    debugPrint('Screen share error: $e');
+  }
+}
+
+Future<void> _disableScreenShare(
+    BuildContext context, MeetingRoomProvider provider) async {
+  try {
+    await provider.room?.localParticipant?.setScreenShareEnabled(false);
+  } catch (e) {
+    debugPrint('Disable screen share error: $e');
+  }
+  await provider.stopScreenShare();
 }
 
 // ─── Teacher: 2 lựa chọn qua dialog ────────────────────────────────────────
@@ -141,7 +247,8 @@ class _TeacherEndCallButton extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cảnh báo: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+                'Cảnh báo: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -193,7 +300,8 @@ class _StudentLeaveButton extends StatelessWidget {
               await provider.disconnect();
               if (context.mounted) Navigator.pop(context);
             },
-            child: const Text('Rời phòng', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Rời phòng', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -208,19 +316,29 @@ class _ToolbarButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final bool isActive;
-  final Color activeColor;
+  final Color? activeColor;
+  final Color inactiveColor;
 
   const _ToolbarButton({
     required this.icon,
     required this.label,
     required this.onTap,
     required this.isActive,
-    required this.activeColor,
+    this.activeColor,
+    this.inactiveColor = Colors.grey,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive ? activeColor : Colors.grey;
+    final Color color;
+    if (isActive) {
+      color = activeColor ??
+          (Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black87);
+    } else {
+      color = inactiveColor;
+    }
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),

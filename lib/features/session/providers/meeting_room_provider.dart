@@ -3,46 +3,136 @@ import 'package:livekit_client/livekit_client.dart';
 
 class MeetingRoomProvider extends ChangeNotifier {
   Room? room;
-  bool isMicOn = true;
-  bool isCamOn = true;
+  bool isMicOn = false;
+  bool isCamOn = false;
+  bool isCamBusy = false;
   bool isChatOpen = false;
   bool isParticipantsOpen = false;
+  bool isScreenShareOn = false;
+  LocalVideoTrack? screenShareTrack;
   List<Participant> participants = [];
   bool _isDisposed = false;
-  bool _isDisconnecting = false; // ← THÊM: guard tránh disconnect 2 lần
+  bool _isDisconnecting = false;
 
-  Future<void> connect(String url, String token) async {
-    room = Room();
+  EventsListener<RoomEvent>? _listener;
+
+  /// Called when the room is disconnected (e.g. server kicked).
+  void Function()? onDisconnected;
+
+  Future<void> connect(
+    String url,
+    String token, {
+    bool enableCamera = true,
+    bool enableMic = true,
+    LocalAudioTrack? audioTrack,
+    LocalVideoTrack? videoTrack,
+  }) async {
+    room = Room(
+      roomOptions: RoomOptions(
+        adaptiveStream: true,
+        dynacast: true,
+        defaultCameraCaptureOptions: const CameraCaptureOptions(
+          maxFrameRate: 30,
+          params: VideoParameters(
+            dimensions: VideoDimensions(1280, 720),
+          ),
+        ),
+        defaultVideoPublishOptions: const VideoPublishOptions(
+          simulcast: true,
+        ),
+      ),
+    );
+
+    _listener = room!.createListener();
     room!.addListener(_onRoomUpdate);
-    await room!.connect(url, token);
-    await room!.localParticipant?.setCameraEnabled(true);
-    await room!.localParticipant?.setMicrophoneEnabled(true);
+    _setupListeners();
+
+    await room!.prepareConnection(url, token);
+
+    if (audioTrack != null || videoTrack != null) {
+      isCamOn = videoTrack != null;
+      isMicOn = audioTrack != null;
+      await room!.connect(
+        url,
+        token,
+        fastConnectOptions: FastConnectOptions(
+          microphone: TrackOption(track: audioTrack),
+          camera: TrackOption(track: videoTrack),
+        ),
+      );
+    } else {
+      isCamOn = enableCamera;
+      isMicOn = enableMic;
+      await room!.connect(url, token);
+      await room!.localParticipant?.setCameraEnabled(enableCamera);
+      await room!.localParticipant?.setMicrophoneEnabled(enableMic);
+    }
+
     _syncParticipants();
     notifyListeners();
   }
 
+  void _setupListeners() {
+    _listener!.on<RoomDisconnectedEvent>((event) {
+      debugPrint('[MeetingRoom] disconnected: ${event.reason}');
+      onDisconnected?.call();
+    });
+  }
+
   void _onRoomUpdate() {
-    if (_isDisconnecting) return; // ← THÊM: bỏ qua update khi đang disconnect
+    if (_isDisconnecting) return;
     _syncParticipants();
     notifyListeners();
   }
 
   void _syncParticipants() {
+    final remotes = room?.remoteParticipants.values.toList() ?? [];
+
+    remotes.sort((a, b) {
+      // Speaking first (louder first)
+      if (a.isSpeaking != b.isSpeaking) {
+        return b.isSpeaking ? 1 : -1;
+      }
+      if (a.isSpeaking && b.isSpeaking) {
+        final aLevel = a.audioLevel;
+        final bLevel = b.audioLevel;
+        if (aLevel != bLevel) return bLevel.compareTo(aLevel);
+      }
+      // More recently spoke first
+      final aSpoke = a.lastSpokeAt;
+      final bSpoke = b.lastSpokeAt;
+      if (aSpoke != null && bSpoke != null && aSpoke != bSpoke) {
+        return bSpoke.compareTo(aSpoke);
+      }
+      if (aSpoke != null && bSpoke == null) return -1;
+      if (aSpoke == null && bSpoke != null) return 1;
+      // Has video first
+      final aHasVideo = a.isCameraEnabled();
+      final bHasVideo = b.isCameraEnabled();
+      if (aHasVideo != bHasVideo) return bHasVideo ? 1 : -1;
+      // Joined earlier first
+      return a.joinedAt.compareTo(b.joinedAt);
+    });
+
     participants = [
       if (room?.localParticipant != null) room!.localParticipant!,
-      ...room?.remoteParticipants.values ?? [],
+      ...remotes,
     ];
   }
 
   Future<void> toggleMic() async {
     isMicOn = !isMicOn;
-    await room?.localParticipant?.setMicrophoneEnabled(isMicOn);
     notifyListeners();
+    await room?.localParticipant?.setMicrophoneEnabled(isMicOn);
   }
 
   Future<void> toggleCam() async {
+    if (isCamBusy) return;
+    isCamBusy = true;
     isCamOn = !isCamOn;
+    notifyListeners();
     await room?.localParticipant?.setCameraEnabled(isCamOn);
+    isCamBusy = false;
     notifyListeners();
   }
 
@@ -58,27 +148,44 @@ class MeetingRoomProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void startScreenShare(LocalVideoTrack track) {
+    screenShareTrack = track;
+    isScreenShareOn = true;
+    notifyListeners();
+  }
+
+  Future<void> stopScreenShare() async {
+    isScreenShareOn = false;
+    final t = screenShareTrack;
+    screenShareTrack = null;
+    notifyListeners();
+    await t?.stop();
+  }
+
   Future<void> disconnect() async {
-    if (room == null || _isDisconnecting) return; // ← guard
+    if (room == null || _isDisconnecting) return;
     _isDisconnecting = true;
 
     final activeRoom = room;
+    final activeListener = _listener;
 
-    // ← THAY ĐỔI: removeListener TRƯỚC khi null room
-    // để _onRoomUpdate không fire trong lúc đang đóng
     activeRoom?.removeListener(_onRoomUpdate);
     room = null;
+    _listener = null;
     participants = [];
 
     try {
-      // ← THÊM: tắt cam + mic trước khi disconnect
-      // giúp LiveKit đóng media track gọn gàng trước khi đóng PeerConnection
-      await activeRoom?.localParticipant?.setCameraEnabled(false);
-      await activeRoom?.localParticipant?.setMicrophoneEnabled(false);
+      await activeListener?.dispose();
+    } catch (_) {}
+
+    try {
       await activeRoom?.disconnect();
-    } catch (_) {
-      // Bỏ qua lỗi platform stream đã bị huỷ
+    } catch (e) {
+      debugPrint('[MeetingRoom] disconnect error (suppressed): $e');
     } finally {
+      try {
+        activeRoom?.dispose();
+      } catch (_) {}
       _isDisconnecting = false;
       notifyListeners();
     }
@@ -94,8 +201,6 @@ class MeetingRoomProvider extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
-    // ← THAY ĐỔI: dùng unawaited pattern thay vì bỏ trống
-    // ignore: discarded_futures
     disconnect();
     super.dispose();
   }
