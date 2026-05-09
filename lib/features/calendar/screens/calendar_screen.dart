@@ -8,9 +8,8 @@ import '../../auth/presentation/controllers/auth_notifier.dart';
 import '../../classroom/domain/entities/classroom_entity.dart';
 import '../../classroom/presentation/controllers/classroom_notifier.dart';
 import '../../session/models/session_model.dart';
-import '../../session/providers/meeting_room_provider.dart';
 import '../../session/providers/session_provider.dart';
-import '../../session/screens/meeting_room_screen.dart';
+import '../../session/screens/join_screen.dart';
 import '../../session/screens/widgets/create_session_dialog.dart';
 import '../../session/screens/widgets/session_data_source.dart';
 import '../../session/screens/widgets/session_detail_popup.dart';
@@ -62,7 +61,7 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
     final DateTime monday = _focusedDate.subtract(
       Duration(days: _focusedDate.weekday - 1),
     );
-    final DateTime friday = monday.add(const Duration(days: 4));
+    final DateTime friday = monday.add(const Duration(days: 6));
     context.read<SessionProvider>().loadSessionsForRange(monday, friday);
   }
 
@@ -146,15 +145,12 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
     }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ChangeNotifierProvider(
-          create: (_) => MeetingRoomProvider(),
-          child: MeetingRoomScreen(
-            sessionId: session.id,
-            livekitUrl: result.livekitUrl,
-            token: result.token,
-            sessionTitle: session.title,
-            isTeacher: true,
-          ),
+        builder: (_) => JoinScreen(
+          sessionId: session.id,
+          livekitUrl: result.livekitUrl,
+          token: result.token,
+          sessionTitle: session.title,
+          isTeacher: true,
         ),
       ),
     );
@@ -173,15 +169,12 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
     }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ChangeNotifierProvider(
-          create: (_) => MeetingRoomProvider(),
-          child: MeetingRoomScreen(
-            sessionId: session.id,
-            livekitUrl: result.livekitUrl,
-            token: result.token,
-            sessionTitle: session.title,
-            isTeacher: false,
-          ),
+        builder: (_) => JoinScreen(
+          sessionId: session.id,
+          livekitUrl: result.livekitUrl,
+          token: result.token,
+          sessionTitle: session.title,
+          isTeacher: false,
         ),
       ),
     );
@@ -193,7 +186,7 @@ class _CalendarDesktopScreenState extends State<CalendarDesktopScreen> {
     final DateTime start = _focusedDate.subtract(
       Duration(days: _focusedDate.weekday - 1),
     );
-    final DateTime end = start.add(const Duration(days: 4));
+    final DateTime end = start.add(const Duration(days: 6));
     const List<String> months = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December',
@@ -808,7 +801,7 @@ class MainCalendarGrid extends StatelessWidget {
     return SfCalendar(
       key: ValueKey(focusedDate.toIso8601String()),
       controller: controller,
-      view: CalendarView.workWeek,
+      view: CalendarView.week,
       firstDayOfWeek: 1,
       showDatePickerButton: false,
       showNavigationArrow: false,
