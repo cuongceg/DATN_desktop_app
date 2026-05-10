@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/session_model.dart';
 import '../models/message_model.dart';
+import '../models/session_participant_model.dart';
 import 'session_api.dart';
 
 class SessionRepository {
@@ -84,6 +87,20 @@ class SessionRepository {
     return data
         .map((json) => MessageModel.fromJson(json as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<SessionParticipantModel>> getParticipants(
+    String sessionId,
+  ) async {
+    final data = await _api.fetchParticipants(sessionId);
+    final list = data['participants'] as List<dynamic>;
+    return list
+        .map((j) => SessionParticipantModel.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> leaveSession(String sessionId) {
+    return _api.leaveSession(sessionId);
   }
 
   Future<MessageModel> sendMessage(String sessionId, String content) async {

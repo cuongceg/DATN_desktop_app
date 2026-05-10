@@ -21,6 +21,7 @@ class SessionProvider extends ChangeNotifier {
   DateTime? _lastFrom;
   DateTime? _lastTo;
 
+  SessionService get service => _service;
   List<SessionModel> get sessions => _sessions;
   bool get isLoading => _isLoading;
   String? get errorMessage => _error;

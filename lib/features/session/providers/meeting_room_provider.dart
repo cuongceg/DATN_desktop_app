@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import '../models/session_participant_model.dart';
+import '../services/session_service.dart';
 
 class MeetingRoomProvider extends ChangeNotifier {
   Room? room;
@@ -11,8 +13,13 @@ class MeetingRoomProvider extends ChangeNotifier {
   bool isScreenShareOn = false;
   LocalVideoTrack? screenShareTrack;
   List<Participant> participants = [];
+  List<SessionParticipantModel> sessionParticipants = [];
+  bool isLoadingParticipants = false;
   bool _isDisposed = false;
   bool _isDisconnecting = false;
+
+  String? _sessionId;
+  SessionService? _sessionService;
 
   EventsListener<RoomEvent>? _listener;
 
@@ -73,10 +80,13 @@ class MeetingRoomProvider extends ChangeNotifier {
   }
 
   void _setupListeners() {
-    _listener!.on<RoomDisconnectedEvent>((event) {
-      debugPrint('[MeetingRoom] disconnected: ${event.reason}');
-      onDisconnected?.call();
-    });
+    _listener!
+      ..on<RoomDisconnectedEvent>((event) {
+        debugPrint('[MeetingRoom] disconnected: ${event.reason}');
+        onDisconnected?.call();
+      })
+      ..on<ParticipantConnectedEvent>((_) => fetchSessionParticipants())
+      ..on<ParticipantDisconnectedEvent>((_) => fetchSessionParticipants());
   }
 
   void _onRoomUpdate() {
@@ -148,6 +158,25 @@ class MeetingRoomProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setSessionContext(String sessionId, SessionService service) {
+    _sessionId = sessionId;
+    _sessionService = service;
+  }
+
+  Future<void> fetchSessionParticipants() async {
+    if (_sessionId == null || _sessionService == null) return;
+    isLoadingParticipants = true;
+    notifyListeners();
+    try {
+      sessionParticipants = await _sessionService!.getParticipants(_sessionId!);
+    } catch (e) {
+      debugPrint('[MeetingRoom] fetchSessionParticipants error: $e');
+    } finally {
+      isLoadingParticipants = false;
+      notifyListeners();
+    }
+  }
+
   void startScreenShare(LocalVideoTrack track) {
     screenShareTrack = track;
     isScreenShareOn = true;
@@ -165,6 +194,14 @@ class MeetingRoomProvider extends ChangeNotifier {
   Future<void> disconnect() async {
     if (room == null || _isDisconnecting) return;
     _isDisconnecting = true;
+
+    final sid = _sessionId;
+    final svc = _sessionService;
+    if (sid != null && svc != null) {
+      svc.leaveSession(sid).catchError((e) {
+        debugPrint('[MeetingRoom] leaveSession error (suppressed): $e');
+      });
+    }
 
     final activeRoom = room;
     final activeListener = _listener;

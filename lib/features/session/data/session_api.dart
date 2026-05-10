@@ -66,6 +66,14 @@ String _mapApiError(DioException e) {
     return 'Bạn không có quyền tạo buổi học cho lớp này.';
   }
 
+  // leaveSession errors
+  if (serverMsg == 'You have not joined this session.') {
+    return 'Bạn chưa tham gia buổi học này.';
+  }
+  if (serverMsg == 'You have already left this session.') {
+    return 'Bạn đã rời buổi học này rồi.';
+  }
+
   // Generic fallback
   if (status == 401) return 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.';
   if (status == 403) return 'Bạn không có quyền thực hiện thao tác này.';
@@ -201,6 +209,25 @@ class SessionApi {
     try {
       final response = await _dio.get('/api/sessions/$sessionId/messages');
       return response.data['messages'] as List<dynamic>;
+    } on DioException catch (e) {
+      throw Exception(_mapApiError(e));
+    }
+  }
+
+  /// GET /api/sessions/:sessionId/participants
+  Future<Map<String, dynamic>> fetchParticipants(String sessionId) async {
+    try {
+      final response = await _dio.get('/api/sessions/$sessionId/participants');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw Exception(_mapApiError(e));
+    }
+  }
+
+  /// PATCH /api/sessions/:sessionId/leave
+  Future<void> leaveSession(String sessionId) async {
+    try {
+      await _dio.patch('/api/sessions/$sessionId/leave');
     } on DioException catch (e) {
       throw Exception(_mapApiError(e));
     }
