@@ -33,14 +33,16 @@ class BottomToolbar extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _ToolbarButton(
-              icon: provider.isMicOn ? Icons.mic : Icons.mic_off,
-              label: provider.isMicOn ? 'Tắt Mic' : 'Bật Mic',
-              onTap: provider.toggleMic,
-              isActive: provider.isMicOn,
-              inactiveColor: Colors.red,
-            ),
-            const SizedBox(width: 16),
+            if (isTeacher) ...[
+              _ToolbarButton(
+                icon: provider.isMicOn ? Icons.mic : Icons.mic_off,
+                label: provider.isMicOn ? 'Tắt Mic' : 'Bật Mic',
+                onTap: provider.toggleMic,
+                isActive: provider.isMicOn,
+                inactiveColor: Colors.red,
+              ),
+              const SizedBox(width: 16),
+            ],
             _ToolbarButton(
               icon: provider.isCamOn ? Icons.videocam : Icons.videocam_off,
               label: provider.isCamOn ? 'Tắt Cam' : 'Bật Cam',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/meeting_room_provider.dart';
+import '../providers/session_provider.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/theme/glass_theme.dart';
 import 'widgets/participant_grid.dart';
@@ -30,11 +31,15 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<MeetingRoomProvider>().onDisconnected = () {
+      final provider = context.read<MeetingRoomProvider>();
+      provider.onDisconnected = () {
         if (mounted) {
           Navigator.popUntil(context, (route) => route.isFirst);
         }
       };
+      final sessionService = context.read<SessionProvider>().service;
+      provider.setSessionContext(widget.sessionId, sessionService);
+      provider.fetchSessionParticipants();
     });
   }
 

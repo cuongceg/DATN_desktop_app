@@ -46,6 +46,10 @@ class _JoinScreenState extends State<JoinScreen> {
   @override
   void initState() {
     super.initState();
+    if (!widget.isTeacher) {
+      _enableVideo = false;
+      _enableAudio = false;
+    }
     _initStateAsync();
   }
 
@@ -176,6 +180,8 @@ class _JoinScreenState extends State<JoinScreen> {
       await provider.connect(
         widget.livekitUrl,
         widget.token,
+        enableMic: _enableAudio,
+        enableCamera: _enableVideo,
         audioTrack: _audioTrack,
         videoTrack: _videoTrack,
       );
@@ -382,65 +388,68 @@ class _JoinScreenState extends State<JoinScreen> {
                       ),
                     ),
 
-                  const SizedBox(height: 8),
+                  if (widget.isTeacher) ...[
+                    const SizedBox(height: 8),
 
-                  // Mic toggle
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Microphone:', style: TextStyle(fontWeight: FontWeight.w600)),
-                      Switch(
-                        value: _enableAudio,
-                        onChanged: _setEnableAudio,
-                        activeColor: GlassTheme.accent,
-                      ),
-                    ],
-                  ),
+                    // Mic toggle
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Microphone:', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Switch(
+                          value: _enableAudio,
+                          onChanged: _setEnableAudio,
+                          activeColor: GlassTheme.accent,
+                        ),
+                      ],
+                    ),
 
-                  // Mic device dropdown
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<MediaDevice>(
-                        isExpanded: true,
-                        hint: Text(
-                          _enableAudio ? 'Chọn microphone' : 'Microphone tắt',
-                          style: TextStyle(
-                            color: isDark ? Colors.white54 : Colors.black45,
+                    // Mic device dropdown
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<MediaDevice>(
+                          isExpanded: true,
+                          hint: Text(
+                            _enableAudio ? 'Chọn microphone' : 'Microphone tắt',
+                            style: TextStyle(
+                              color: isDark ? Colors.white54 : Colors.black45,
+                            ),
                           ),
-                        ),
-                        items: _enableAudio
-                            ? _audioInputs
-                                .map(
-                                  (d) => DropdownMenuItem<MediaDevice>(
-                                    value: d,
-                                    child: Text(
-                                      d.label.isNotEmpty ? d.label : 'Microphone ${_audioInputs.indexOf(d) + 1}',
-                                      style: const TextStyle(fontSize: 14),
-                                      overflow: TextOverflow.ellipsis,
+                          items: _enableAudio
+                              ? _audioInputs
+                                  .map(
+                                    (d) => DropdownMenuItem<MediaDevice>(
+                                      value: d,
+                                      child: Text(
+                                        d.label.isNotEmpty ? d.label : 'Microphone ${_audioInputs.indexOf(d) + 1}',
+                                        style: const TextStyle(fontSize: 14),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                )
-                                .toList()
-                            : [],
-                        value: _selectedAudioDevice,
-                        onChanged: _enableAudio
-                            ? (MediaDevice? value) async {
-                                if (value != null) {
-                                  _selectedAudioDevice = value;
-                                  await _changeLocalAudioTrack();
-                                  if (mounted) setState(() {});
+                                  )
+                                  .toList()
+                              : [],
+                          value: _selectedAudioDevice,
+                          onChanged: _enableAudio
+                              ? (MediaDevice? value) async {
+                                  if (value != null) {
+                                    _selectedAudioDevice = value;
+                                    await _changeLocalAudioTrack();
+                                    if (mounted) setState(() {});
+                                  }
                                 }
-                              }
-                            : null,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontSize: 14,
+                              : null,
+                          style: TextStyle(
+                            color: isDark ? Colors.white : Colors.black87,
+                            fontSize: 14,
+                          ),
+                          dropdownColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
                         ),
-                        dropdownColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
                       ),
                     ),
-                  ),
+                  ] else
+                    const SizedBox(height: 24),
 
                   // Join button
                   ElevatedButton(

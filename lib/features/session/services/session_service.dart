@@ -1,5 +1,7 @@
 import '../data/session_repository.dart';
+import '../models/message_model.dart';
 import '../models/session_model.dart';
+import '../models/session_participant_model.dart';
 
 /// Service layer cho Session feature.
 ///
@@ -74,5 +76,21 @@ class SessionService {
     String sessionId,
   ) {
     return _repo.joinSession(sessionId);
+  }
+
+  Future<List<SessionParticipantModel>> getParticipants(String sessionId) {
+    return _repo.getParticipants(sessionId);
+  }
+
+  Future<void> leaveSession(String sessionId) {
+    return _repo.leaveSession(sessionId);
+  }
+
+  Future<List<MessageModel>> fetchMessages(String sessionId) {
+    return _repo.fetchMessages(sessionId);
+  }
+
+  Future<MessageModel> sendMessage(String sessionId, String content) {
+    return _repo.sendMessage(sessionId, content);
   }
 }
