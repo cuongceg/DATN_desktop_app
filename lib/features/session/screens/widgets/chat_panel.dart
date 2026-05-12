@@ -211,24 +211,47 @@ class _ChatPanelState extends State<ChatPanel> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          enabled: !chat.isSending,
-                          decoration: InputDecoration(
-                            hintText: 'Nhập tin nhắn...',
-                            filled: true,
-                            fillColor: Colors.black26,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                          ),
-                          onSubmitted:
-                              chat.isSending ? null : (_) => _send(chat),
+                        child: Builder(
+                          builder: (context) {
+                            final isDark = Theme.of(context).brightness == Brightness.dark;
+                            return TextField(
+                              controller: _textController,
+                              enabled: !chat.isSending,
+                              style: TextStyle(
+                                color: isDark ? GlassTheme.darkText : GlassTheme.lightText,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Nhập tin nhắn...',
+                                hintStyle: TextStyle(
+                                  color: isDark ? GlassTheme.darkSubText : GlassTheme.lightSubText,
+                                ),
+                                filled: true,
+                                fillColor: isDark ? GlassTheme.darkSurface : GlassTheme.lightSurface,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide(
+                                    color: isDark ? GlassTheme.darkBorder : GlassTheme.lightBorder,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide(
+                                    color: isDark ? GlassTheme.darkBorder : GlassTheme.lightBorder,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: const BorderSide(color: GlassTheme.accent),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                              ),
+                              onSubmitted:
+                                  chat.isSending ? null : (_) => _send(chat),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
