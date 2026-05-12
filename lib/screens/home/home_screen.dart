@@ -7,6 +7,7 @@ import '../../models/class_member.dart';
 import '../../models/class_notification.dart';
 import '../../models/user.dart';
 import '../../features/calendar/screens/calendar_screen.dart';
+import '../../features/stt/presentation/screens/stt_poc_screen.dart';
 import '../../widgets/sidebar_navigation.dart';
 
 /// Root shell screen that owns the sidebar navigation and routes to the
@@ -138,6 +139,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return const CalendarDesktopScreen();
       case 3:
+        return const SttPocScreen();
+      case 4:
         return const _CenterTextScreen(text: 'Cài đặt');
       default:
         return const SizedBox.shrink();

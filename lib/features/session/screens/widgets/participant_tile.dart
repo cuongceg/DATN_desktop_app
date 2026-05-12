@@ -8,6 +8,7 @@ class ParticipantTile extends StatefulWidget {
   final VoidCallback? onPin;
   final bool isPinned;
   final bool isLoading;
+  final String? displayName;
 
   const ParticipantTile({
     super.key,
@@ -15,6 +16,7 @@ class ParticipantTile extends StatefulWidget {
     this.onPin,
     this.isPinned = false,
     this.isLoading = false,
+    this.displayName,
   });
 
   @override
@@ -58,6 +60,8 @@ class _ParticipantTileState extends State<ParticipantTile> {
     final isSpeaking = widget.participant.isSpeaking;
     final isMicOn = widget.participant.isMicrophoneEnabled();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final name = widget.displayName ??
+        (widget.participant.name.isNotEmpty ? widget.participant.name : 'Unknown');
 
     return GestureDetector(
       onTap: widget.onPin,
@@ -93,9 +97,7 @@ class _ParticipantTileState extends State<ParticipantTile> {
                             radius: 40,
                             backgroundColor: GlassTheme.accent,
                             child: Text(
-                              widget.participant.name.isNotEmpty
-                                  ? widget.participant.name[0].toUpperCase()
-                                  : '?',
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
                               style: const TextStyle(
                                 fontSize: 32,
                                 color: Colors.white,
@@ -123,9 +125,7 @@ class _ParticipantTileState extends State<ParticipantTile> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        widget.participant.name.isNotEmpty
-                            ? widget.participant.name
-                            : 'Unknown',
+                        name,
                         style: const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ],

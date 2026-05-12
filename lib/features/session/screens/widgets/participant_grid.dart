@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:provider/provider.dart';
+import '../../models/session_participant_model.dart';
+import '../../providers/meeting_room_provider.dart';
 import 'participant_tile.dart';
 import 'screen_share_tile.dart';
 
@@ -7,7 +10,9 @@ class ParticipantGrid extends StatefulWidget {
   final List<Participant> participants;
   final String? localParticipantSid;
   final bool isLocalCamStarting;
-  final LocalVideoTrack? screenShareTrack;
+  final VideoTrack? screenShareTrack;
+  final bool isLocalScreenShare;
+  final String screenSharerName;
   final Future<void> Function()? onStopScreenShare;
 
   const ParticipantGrid({
@@ -16,6 +21,8 @@ class ParticipantGrid extends StatefulWidget {
     this.localParticipantSid,
     this.isLocalCamStarting = false,
     this.screenShareTrack,
+    this.isLocalScreenShare = true,
+    this.screenSharerName = '',
     this.onStopScreenShare,
   });
 
@@ -54,18 +61,37 @@ class _ParticipantGridState extends State<ParticipantGrid> {
         onStop: widget.onStopScreenShare ?? () async {},
         isPinned: false,
         onPin: null,
+        isLocal: widget.isLocalScreenShare,
+        sharerName: widget.screenSharerName,
       );
 
 
-  Widget _participantTile(Participant p, {bool isPinned = false}) =>
+  String _resolveName(Participant p, List<SessionParticipantModel> apiParts) {
+    try {
+      return apiParts.firstWhere((a) => a.userId == p.identity).fullName;
+    } catch (_) {
+      return p.name.isNotEmpty ? p.name : 'Unknown';
+    }
+  }
+
+  Widget _participantTile(
+    Participant p, {
+    bool isPinned = false,
+    List<SessionParticipantModel> apiParts = const [],
+  }) =>
       ParticipantTile(
         participant: p,
         isPinned: isPinned,
         isLoading: _isLocalCamStarting(p),
         onPin: isPinned ? _unpin : () => _pinParticipant(p),
+        displayName: _resolveName(p, apiParts),
       );
 
-  Widget _buildParticipantGrid(List<Participant> participants, {required bool isSideBar}) {
+  Widget _buildParticipantGrid(
+    List<Participant> participants, {
+    required bool isSideBar,
+    List<SessionParticipantModel> apiParts = const [],
+  }) {
     final int totalItems = participants.length;
     int displayCount = totalItems;
     bool hasOverflow = false;
@@ -94,40 +120,54 @@ class _ParticipantGridState extends State<ParticipantGrid> {
       }
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        childAspectRatio: 16 / 9,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: gridItemsCount,
-      itemBuilder: (_, i) {
-        if (hasOverflow && i == 15) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '+${totalItems - 15} người',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-          );
-        }
-        return _participantTile(participants[i]);
+    final int rowCount = (gridItemsCount / crossAxisCount).ceil();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 8.0;
+        final tileHeight =
+            ((constraints.maxHeight - 16 - spacing * (rowCount - 1)) / rowCount)
+                .clamp(50.0, double.infinity);
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(8),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisExtent: tileHeight,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+          ),
+          itemCount: gridItemsCount,
+          itemBuilder: (_, i) {
+            if (hasOverflow && i == 15) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '+${totalItems - 15} người',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              );
+            }
+            return _participantTile(participants[i], apiParts: apiParts);
+          },
+        );
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final apiParts =
+        context.read<MeetingRoomProvider>().sessionParticipants;
     final hasScreenShare = widget.screenShareTrack != null;
 
     if (widget.participants.isEmpty && !hasScreenShare) {
@@ -148,7 +188,11 @@ class _ParticipantGridState extends State<ParticipantGrid> {
           if (widget.participants.isNotEmpty)
             Expanded(
               flex: 1,
-              child: _buildParticipantGrid(widget.participants, isSideBar: true),
+              child: _buildParticipantGrid(
+                widget.participants,
+                isSideBar: true,
+                apiParts: apiParts,
+              ),
             ),
         ],
       );
@@ -166,19 +210,31 @@ class _ParticipantGridState extends State<ParticipantGrid> {
             flex: 3,
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: _participantTile(pinnedParticipant!, isPinned: true),
+              child: _participantTile(
+                pinnedParticipant!,
+                isPinned: true,
+                apiParts: apiParts,
+              ),
             ),
           ),
           if (others.isNotEmpty)
             Expanded(
               flex: 1,
-              child: _buildParticipantGrid(others, isSideBar: true),
+              child: _buildParticipantGrid(
+                others,
+                isSideBar: true,
+                apiParts: apiParts,
+              ),
             ),
         ],
       );
     }
 
     // ── Auto grid (nothing pinned) ────────────────────────────────────────────
-    return _buildParticipantGrid(widget.participants, isSideBar: false);
+    return _buildParticipantGrid(
+      widget.participants,
+      isSideBar: false,
+      apiParts: apiParts,
+    );
   }
 }

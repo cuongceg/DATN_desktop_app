@@ -6,10 +6,12 @@ import '../../../../core/theme/glass_theme.dart';
 import '../../../../core/widgets/glass_card.dart';
 
 class ScreenShareTile extends StatefulWidget {
-  final LocalVideoTrack track;
+  final VideoTrack track;
   final Future<void> Function() onStop;
   final VoidCallback? onPin;
   final bool isPinned;
+  final bool isLocal;
+  final String sharerName;
 
   const ScreenShareTile({
     super.key,
@@ -17,6 +19,8 @@ class ScreenShareTile extends StatefulWidget {
     required this.onStop,
     this.onPin,
     this.isPinned = false,
+    this.isLocal = true,
+    this.sharerName = '',
   });
 
   @override
@@ -95,40 +99,45 @@ class _ScreenShareTileState extends State<ScreenShareTile> {
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.screen_share, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
+                      const Icon(Icons.screen_share, color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
                       Text(
-                        'Màn hình của bạn',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
+                        widget.isLocal
+                            ? 'Màn hình của bạn'
+                            : (widget.sharerName.isNotEmpty
+                                ? 'Màn hình của ${widget.sharerName}'
+                                : 'Màn hình'),
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // ── Stop button ───────────────────────────────────────────
-              Positioned(
-                top: 4,
-                right: 4,
-                child: GestureDetector(
-                  onTap: () => widget.onStop(),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.stop_screen_share,
-                      color: Colors.white,
-                      size: 18,
+              // ── Stop button (only shown for local share) ──────────────
+              if (widget.isLocal)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => widget.onStop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.stop_screen_share,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
-              ),
 
               // ── Pin indicator ─────────────────────────────────────────
               if (widget.isPinned)

@@ -120,15 +120,25 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: ParticipantGrid(
-                          participants: provider.participants,
-                          localParticipantSid:
-                              provider.room?.localParticipant?.sid,
-                          isLocalCamStarting:
-                              provider.isCamBusy && provider.isCamOn,
-                          screenShareTrack: provider.screenShareTrack,
-                          onStopScreenShare: _stopScreenShare,
-                        ),
+                        child: Builder(builder: (context) {
+                          final isLocalShare = provider.screenShareTrack != null;
+                          final effectiveShare = provider.screenShareTrack ??
+                              provider.remoteScreenShareTrack;
+                          return ParticipantGrid(
+                            participants: provider.participants,
+                            localParticipantSid:
+                                provider.room?.localParticipant?.sid,
+                            isLocalCamStarting:
+                                provider.isCamBusy && provider.isCamOn,
+                            screenShareTrack: effectiveShare,
+                            isLocalScreenShare: isLocalShare,
+                            screenSharerName: isLocalShare
+                                ? ''
+                                : provider.remoteScreenSharerName,
+                            onStopScreenShare:
+                                isLocalShare ? _stopScreenShare : null,
+                          );
+                        }),
                       ),
                       if (provider.isChatOpen) ...[
                         const SizedBox(width: 16),

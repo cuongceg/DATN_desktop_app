@@ -12,6 +12,8 @@ class MeetingRoomProvider extends ChangeNotifier {
   bool isParticipantsOpen = false;
   bool isScreenShareOn = false;
   LocalVideoTrack? screenShareTrack;
+  VideoTrack? remoteScreenShareTrack;
+  String remoteScreenSharerName = '';
   List<Participant> participants = [];
   List<SessionParticipantModel> sessionParticipants = [];
   bool isLoadingParticipants = false;
@@ -86,7 +88,15 @@ class MeetingRoomProvider extends ChangeNotifier {
         onDisconnected?.call();
       })
       ..on<ParticipantConnectedEvent>((_) => fetchSessionParticipants())
-      ..on<ParticipantDisconnectedEvent>((_) => fetchSessionParticipants());
+      ..on<ParticipantDisconnectedEvent>((_) => fetchSessionParticipants())
+      ..on<TrackSubscribedEvent>((_) {
+        _syncParticipants();
+        notifyListeners();
+      })
+      ..on<TrackUnsubscribedEvent>((_) {
+        _syncParticipants();
+        notifyListeners();
+      });
   }
 
   void _onRoomUpdate() {
@@ -97,6 +107,25 @@ class MeetingRoomProvider extends ChangeNotifier {
 
   void _syncParticipants() {
     final remotes = room?.remoteParticipants.values.toList() ?? [];
+
+    // Detect remote screen share
+    VideoTrack? remoteShare;
+    String remoteName = '';
+    outer:
+    for (final remote in remotes) {
+      for (final pub in remote.videoTrackPublications) {
+        if (pub.source == TrackSource.screenShareVideo && !pub.muted) {
+          final track = pub.track as VideoTrack?;
+          if (track != null) {
+            remoteShare = track;
+            remoteName = remote.name.isNotEmpty ? remote.name : remote.identity;
+            break outer;
+          }
+        }
+      }
+    }
+    remoteScreenShareTrack = remoteShare;
+    remoteScreenSharerName = remoteName;
 
     remotes.sort((a, b) {
       // Speaking first (louder first)
