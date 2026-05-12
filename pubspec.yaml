@@ -50,6 +50,10 @@ dependencies:
   # State management — required for AuthNotifier (REFACTOR-001)
   provider: ^6.1.2
   livekit_client: ^2.7.0
+  timezone: ^0.11.0
+  sherpa_onnx: ^1.13.1
+  record: ^6.2.0
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +81,7 @@ flutter:
   assets:
    - assets/images/
    - assets/animations/
+   - assets/models/stt/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
