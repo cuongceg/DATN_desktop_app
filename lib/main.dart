@@ -22,6 +22,7 @@ import 'features/session/data/session_api.dart';
 import 'features/session/data/session_repository.dart';
 import 'features/session/providers/session_provider.dart';
 import 'features/session/services/session_service.dart';
+import 'features/stt/services/stt_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
 Future<void> main() async {
@@ -29,6 +30,15 @@ Future<void> main() async {
   tz.initializeTimeZones();
   _suppressKnownWebRtcErrors();
   await _configureDesktopWindow();
+
+  // --- STT model pre-load (runs before UI appears) ---
+  final sttService = SttService();
+  try {
+    await sttService.initialize();
+  } catch (e) {
+    // initError is stored on sttService; screen will surface it
+    debugPrint('STT init failed: $e');
+  }
 
   // --- Dependency wiring ---
   const secureStorage = FlutterSecureStorage();
@@ -61,6 +71,7 @@ Future<void> main() async {
             SessionService(SessionRepository(SessionApi(apiClient.dio))),
           ),
         ),
+        Provider<SttService>.value(value: sttService),
       ],
       child: EducationDesktopApp(
         authStorage: authStorage,
