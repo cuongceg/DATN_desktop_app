@@ -1,29 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_web_rtc/features/posts/models/post_model.dart';
+import 'package:flutter_web_rtc/features/session/providers/session_provider.dart';
+import 'package:flutter_web_rtc/features/session/screens/join_screen.dart';
 import 'package:flutter_web_rtc/widgets/app_react_button.dart';
 
 enum PostMenuAction { modify, delete }
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
 
 class PostCard extends StatelessWidget {
   const PostCard({
     super.key,
     required this.post,
+    required this.currentUserId,
+    required this.isTeacher,
     required this.onDeletePost,
     required this.onModifyPost,
   });
 
-  final PostCardData post;
-  final void Function(PostCardData post) onDeletePost;
-  final void Function(PostCardData post) onModifyPost;
+  final PostModel post;
+  final String currentUserId;
+  final bool isTeacher;
+  final void Function(PostModel post) onDeletePost;
+  final void Function(PostModel post) onModifyPost;
+
+  @override
+  Widget build(BuildContext context) {
+    if (post.type == 'session') {
+      return SessionPostCard(post: post, isTeacher: isTeacher);
+    }
+    return _NormalPostCard(
+      post: post,
+      currentUserId: currentUserId,
+      onDeletePost: onDeletePost,
+      onModifyPost: onModifyPost,
+    );
+  }
+}
+
+// ─── Normal post card ─────────────────────────────────────────────────────────
+
+class _NormalPostCard extends StatelessWidget {
+  const _NormalPostCard({
+    required this.post,
+    required this.currentUserId,
+    required this.onDeletePost,
+    required this.onModifyPost,
+  });
+
+  final PostModel post;
+  final String currentUserId;
+  final void Function(PostModel) onDeletePost;
+  final void Function(PostModel) onModifyPost;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = Theme.of(context).colorScheme;
+    final colors = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
     final cardColor = isLight
         ? Color.alphaBlend(const Color(0x0A000000), colors.surface)
         : Color.alphaBlend(const Color(0x12FFFFFF), colors.surface);
+    final isAuthor = post.authorId == currentUserId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -31,18 +71,14 @@ class PostCard extends StatelessWidget {
         color: cardColor,
         borderRadius: BorderRadius.circular(8),
         border: Border(
-          left: BorderSide(
-            color: colors.secondary,
-            width: 4,
-          ), // Dải viền màu cam đặc trưng
+          left: BorderSide(color: colors.secondary, width: 4),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Avatar, Tên, Thời gian
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -50,7 +86,7 @@ class PostCard extends StatelessWidget {
                   radius: 18,
                   backgroundColor: colors.primaryContainer,
                   child: Text(
-                    post.authorInitials,
+                    _initials(post.authorName),
                     style: TextStyle(
                       fontSize: 12,
                       color: colors.onPrimaryContainer,
@@ -66,44 +102,34 @@ class PostCard extends StatelessWidget {
                         children: [
                           Text(
                             post.authorName,
-                            style: TextStyle(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            post.postedAt,
-                            style: TextStyle(
+                            _formatDate(post.createdAt),
+                            style: theme.textTheme.bodySmall?.copyWith(
                               color: colors.onSurfaceVariant,
-                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-
-                      Text(
-                        post.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      if (post.title != null && post.title!.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          post.title!,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 12),
-
                       _PostBodyView(post: post),
-                      const SizedBox(height: 16),
-
-                      // Link Preview Card
-                      if (post.linkSummary.isNotEmpty ||
-                          post.linkDomain.isNotEmpty)
-                        LinkPreviewCard(post: post),
                     ],
                   ),
                 ),
-                // Icon nhóm góc phải
-                if (post.authorName == 'Do Manh Cuong 20225172')
+                if (isAuthor)
                   PopupMenuButton<PostMenuAction>(
                     tooltip: 'Post actions',
                     onSelected: (action) {
@@ -114,14 +140,14 @@ class PostCard extends StatelessWidget {
                           onDeletePost(post);
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem<PostMenuAction>(
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
                         value: PostMenuAction.modify,
-                        child: Text('Modify post'),
+                        child: Text('Chỉnh sửa'),
                       ),
-                      PopupMenuItem<PostMenuAction>(
+                      PopupMenuItem(
                         value: PostMenuAction.delete,
-                        child: Text('Delete post'),
+                        child: Text('Xóa'),
                       ),
                     ],
                     icon: Icon(
@@ -133,7 +159,6 @@ class PostCard extends StatelessWidget {
               ],
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.only(left: 58, bottom: 8),
             child: AppReactButton(
@@ -141,17 +166,17 @@ class PostCard extends StatelessWidget {
               icon: Icons.add_reaction_outlined,
               iconColor: colors.onSurfaceVariant,
               itemSize: const Size(44, 44),
-              boxColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+              boxColor: colors.surfaceContainerHigh,
               onReactionChanged: (_) {},
             ),
           ),
-
-          // Vùng Reply (Phản hồi)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: colors.outlineVariant.withOpacity(0.6)),
+                top: BorderSide(
+                  color: colors.outlineVariant.withValues(alpha: 0.6),
+                ),
               ),
             ),
             child: Row(
@@ -160,7 +185,7 @@ class PostCard extends StatelessWidget {
                   radius: 14,
                   backgroundColor: colors.surfaceContainerHighest,
                   child: Text(
-                    post.replyInitials,
+                    _initials(post.authorName),
                     style: TextStyle(
                       fontSize: 10,
                       color: colors.onSurfaceVariant,
@@ -170,9 +195,8 @@ class PostCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Text(
                   'Reply',
-                  style: TextStyle(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: colors.onSurfaceVariant,
-                    fontSize: 14,
                   ),
                 ),
               ],
@@ -184,34 +208,258 @@ class PostCard extends StatelessWidget {
   }
 }
 
-class PostCardData {
-  const PostCardData({
-    required this.authorName,
-    required this.authorInitials,
-    required this.postedAt,
-    required this.title,
-    required this.content,
-    this.bodyDelta,
-    required this.linkSummary,
-    required this.linkDomain,
-    required this.replyInitials,
+// ─── Session post card ────────────────────────────────────────────────────────
+
+class SessionPostCard extends StatefulWidget {
+  const SessionPostCard({
+    super.key,
+    required this.post,
+    required this.isTeacher,
   });
 
-  final String authorName;
-  final String authorInitials;
-  final String postedAt;
-  final String title;
-  final String content;
-  final List<dynamic>? bodyDelta;
-  final String linkSummary;
-  final String linkDomain;
-  final String replyInitials;
+  final PostModel post;
+  final bool isTeacher;
+
+  @override
+  State<SessionPostCard> createState() => _SessionPostCardState();
 }
+
+class _SessionPostCardState extends State<SessionPostCard> {
+  bool _isLoading = false;
+
+  Future<void> _handleStart() async {
+    final sessionId = widget.post.sessionId;
+    if (sessionId == null) return;
+    setState(() => _isLoading = true);
+    final provider = context.read<SessionProvider>();
+    try {
+      final started = await provider.startSession(sessionId);
+      if (started == null) {
+        if (mounted) _showError(provider.errorMessage ?? 'Không thể bắt đầu buổi học');
+        return;
+      }
+      final joinData = await provider.joinSession(sessionId);
+      if (joinData == null) {
+        if (mounted) _showError(provider.errorMessage ?? 'Không lấy được token');
+        return;
+      }
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => JoinScreen(
+            sessionId: sessionId,
+            livekitUrl: joinData.livekitUrl,
+            token: joinData.token,
+            sessionTitle: widget.post.sessionTitle ?? '',
+            isTeacher: true,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleJoin() async {
+    final sessionId = widget.post.sessionId;
+    if (sessionId == null) return;
+    setState(() => _isLoading = true);
+    final provider = context.read<SessionProvider>();
+    try {
+      final joinData = await provider.joinSession(sessionId);
+      if (joinData == null) {
+        if (mounted) _showError(provider.errorMessage ?? 'Không lấy được token');
+        return;
+      }
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => JoinScreen(
+            sessionId: sessionId,
+            livekitUrl: joinData.livekitUrl,
+            token: joinData.token,
+            sessionTitle: widget.post.sessionTitle ?? '',
+            isTeacher: false,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
+    final cardColor = isLight
+        ? Color.alphaBlend(const Color(0x0A000000), colors.surface)
+        : Color.alphaBlend(const Color(0x12FFFFFF), colors.surface);
+
+    final status = widget.post.sessionStatus;
+    final scheduledAt = widget.post.sessionScheduledAt;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(color: colors.primary, width: 4),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colors.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.videocam_rounded,
+                color: colors.onPrimaryContainer,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.post.sessionTitle ?? 'Buổi học trực tuyến',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusBadge(status: status),
+                    ],
+                  ),
+                  if (scheduledAt != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.schedule_outlined,
+                          size: 14,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatSessionTime(scheduledAt),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (_isLoading)
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colors.primary,
+                          ),
+                        )
+                      else if (widget.isTeacher && status == 'scheduled')
+                        FilledButton.icon(
+                          onPressed: _handleStart,
+                          icon: const Icon(Icons.play_arrow, size: 18),
+                          label: const Text('Bắt đầu'),
+                        )
+                      else if (!widget.isTeacher && status == 'ongoing')
+                        FilledButton.icon(
+                          onPressed: _handleJoin,
+                          icon: const Icon(Icons.video_call, size: 18),
+                          label: const Text('Tham gia'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    final (label, bg, fg) = switch (status) {
+      'scheduled' => (
+          'Sắp diễn ra',
+          colors.primaryContainer,
+          colors.onPrimaryContainer,
+        ),
+      'ongoing' => (
+          'Đang diễn ra',
+          colors.tertiaryContainer,
+          colors.onTertiaryContainer,
+        ),
+      'completed' => (
+          'Đã kết thúc',
+          colors.surfaceContainerHighest,
+          colors.onSurfaceVariant,
+        ),
+      _ => ('Không xác định', colors.surfaceContainerHighest, colors.onSurfaceVariant),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(color: fg),
+      ),
+    );
+  }
+}
+
+// ─── Body view (Quill or plain text) ─────────────────────────────────────────
 
 class _PostBodyView extends StatefulWidget {
   const _PostBodyView({required this.post});
 
-  final PostCardData post;
+  final PostModel post;
 
   @override
   State<_PostBodyView> createState() => _PostBodyViewState();
@@ -219,10 +467,12 @@ class _PostBodyView extends StatefulWidget {
 
 class _PostBodyViewState extends State<_PostBodyView> {
   late QuillController _controller;
+  late bool _useQuill;
 
   @override
   void initState() {
     super.initState();
+    _useQuill = widget.post.bodyDelta != null;
     _controller = _buildController();
   }
 
@@ -231,15 +481,16 @@ class _PostBodyViewState extends State<_PostBodyView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.post != widget.post) {
       _controller.dispose();
+      _useQuill = widget.post.bodyDelta != null;
       _controller = _buildController();
     }
   }
 
   QuillController _buildController() {
-    final delta = widget.post.bodyDelta;
-    final document = (delta != null && delta.isNotEmpty)
-        ? Document.fromJson(delta)
-        : (Document()..insert(0, widget.post.content));
+    final ops = widget.post.bodyDelta?['ops'];
+    final document = (ops is List && ops.isNotEmpty)
+        ? Document.fromJson(ops)
+        : (Document()..insert(0, widget.post.bodyPlain ?? ''));
     return QuillController(
       document: document,
       selection: const TextSelection.collapsed(offset: 0),
@@ -255,7 +506,18 @@ class _PostBodyViewState extends State<_PostBodyView> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    if (!_useQuill) {
+      return Text(
+        widget.post.bodyPlain ?? '',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: colors.onSurface,
+          height: 1.5,
+        ),
+      );
+    }
 
     return QuillEditor.basic(
       controller: _controller,
@@ -266,7 +528,7 @@ class _PostBodyViewState extends State<_PostBodyView> {
         padding: EdgeInsets.zero,
         customStyles: DefaultStyles(
           paragraph: DefaultTextBlockStyle(
-            Theme.of(context).textTheme.bodyMedium?.copyWith(
+            theme.textTheme.bodyMedium?.copyWith(
                   color: colors.onSurface,
                   height: 1.5,
                 ) ??
@@ -282,137 +544,30 @@ class _PostBodyViewState extends State<_PostBodyView> {
   }
 }
 
-class PostCardSamples {
-  static const List<PostCardData> posts = [
-    PostCardData(
-      authorName: 'Trịnh Thành Trung',
-      authorInitials: 'TT',
-      postedAt: 'Yesterday 11:38 AM',
-      title: 'Thông báo lịch seminar AI ứng dụng trong giáo dục',
-      content:
-          'Chào các bạn K67 - Trường CNTT&TT, mời tham gia seminar AI ứng dụng trong giáo dục vào 14:00 thứ Sáu tuần này tại phòng 505 C7.\n\nDiễn giả: TS. Nguyễn Minh Quân.\nĐăng ký trước 17:00 ngày mai để nhận tài liệu.',
-      linkSummary:
-          'Seminar AI trong giáo dục sẽ chia sẻ case study thực tế và demo hệ thống trợ giảng thông minh cho lớp học đại học.',
-      linkDomain: 'ctsv.soict.hust.edu.vn',
-      replyInitials: 'DC',
-    ),
-    PostCardData(
-      authorName: 'Lê Hải Đăng',
-      authorInitials: 'LD',
-      postedAt: 'Today 8:12 AM',
-      title: 'Mời đăng ký cuộc thi Hackathon Smart Campus 2026',
-      content:
-          'Phòng Công tác sinh viên mở đăng ký Hackathon Smart Campus 2026 dành cho sinh viên toàn trường.\n\nMỗi đội 3-5 thành viên, vòng sơ loại nộp đề cương trước 20/04/2026.\nGiải nhất: 30.000.000đ và cơ hội ươm tạo dự án.',
-      linkSummary:
-          'Hackathon Smart Campus 2026 tập trung các bài toán quản lý đào tạo, tối ưu năng lượng và trải nghiệm học tập số.',
-      linkDomain: 'hackathon.hust.edu.vn',
-      replyInitials: 'DC',
-    ),
-    PostCardData(
-      authorName: 'Phạm Thu Hà',
-      authorInitials: 'PH',
-      postedAt: 'Mar 30, 4:45 PM',
-      title: 'Thông báo lịch bảo trì hệ thống LMS cuối tuần',
-      content:
-          'Trung tâm CNTT sẽ bảo trì hệ thống LMS từ 23:00 thứ Bảy đến 05:00 Chủ nhật.\n\nTrong thời gian này, chức năng nộp bài và chấm điểm tạm thời gián đoạn.\nĐề nghị giảng viên và sinh viên chủ động kế hoạch học tập.',
-      linkSummary:
-          'Kế hoạch bảo trì LMS tháng 4/2026: nâng cấp cơ sở dữ liệu, tối ưu tốc độ truy cập và tăng độ ổn định hệ thống.',
-      linkDomain: 'lms.hust.edu.vn',
-      replyInitials: 'DC',
-    ),
-    PostCardData(
-      authorName: 'Đoàn Thanh niên SOICT',
-      authorInitials: 'DT',
-      postedAt: 'Mar 29, 9:10 AM',
-      title: 'Tuyển tình nguyện viên Ngày hội việc làm 2026',
-      content:
-          'Đoàn trường tuyển 60 tình nguyện viên hỗ trợ sự kiện Ngày hội việc làm 2026 diễn ra tại hội trường C2.\n\nQuyền lợi: giấy chứng nhận, áo sự kiện, hỗ trợ ăn trưa.\nPhỏng vấn nhanh vào chiều thứ Năm tuần này.',
-      linkSummary:
-          'Ngày hội việc làm 2026 quy tụ hơn 80 doanh nghiệp công nghệ và hàng nghìn vị trí thực tập, tuyển dụng cho sinh viên.',
-      linkDomain: 'youth.soict.hust.edu.vn',
-      replyInitials: 'DC',
-    ),
-  ];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+String _initials(String name) {
+  final words = name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return '?';
+  if (words.length == 1) {
+    final w = words.first.toUpperCase();
+    return w.length >= 2 ? w.substring(0, 2) : w;
+  }
+  return '${words.first[0]}${words[1][0]}'.toUpperCase();
 }
 
-class LinkPreviewCard extends StatelessWidget {
-  const LinkPreviewCard({super.key, required this.post});
+String _formatDate(DateTime dt) {
+  final d = dt.day.toString().padLeft(2, '0');
+  final m = dt.month.toString().padLeft(2, '0');
+  final h = dt.hour.toString().padLeft(2, '0');
+  final min = dt.minute.toString().padLeft(2, '0');
+  return '$d/$m/${dt.year} $h:$min';
+}
 
-  final PostCardData post;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = constraints.maxWidth < 100
-            ? constraints.maxWidth
-            : 100.0;
-        final previewColor = isLight
-            ? Color.alphaBlend(const Color(0x14000000), colors.surface)
-            : Color.alphaBlend(
-                const Color(0x10FFFFFF),
-                colors.surfaceContainer,
-              );
-        final previewImageColor = isLight
-            ? colors.surfaceContainerHighest
-            : colors.surfaceContainerHigh;
-
-        return SizedBox(
-          width: cardWidth,
-          child: Container(
-            decoration: BoxDecoration(
-              color: previewColor,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: cardWidth,
-                  height: cardWidth * 0.62,
-                  color: previewImageColor,
-                  child: Icon(
-                    Icons.account_balance,
-                    color: colors.onSurfaceVariant,
-                    size: 24,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.linkSummary,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        post.linkDomain,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+String _formatSessionTime(DateTime dt) {
+  final d = dt.day.toString().padLeft(2, '0');
+  final m = dt.month.toString().padLeft(2, '0');
+  final h = dt.hour.toString().padLeft(2, '0');
+  final min = dt.minute.toString().padLeft(2, '0');
+  return '$h:$min $d/$m/${dt.year}';
 }

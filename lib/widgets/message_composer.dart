@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_web_rtc/features/auth/presentation/controllers/auth_notifier.dart';
 
 class MessageComposer extends StatefulWidget {
   const MessageComposer({
     super.key,
-    required this.userName,
-    required this.userInitials,
     required this.onClose,
     required this.onPost,
     this.initialSubject = '',
@@ -15,8 +15,6 @@ class MessageComposer extends StatefulWidget {
     this.postButtonLabel = 'Post',
   });
 
-  final String userName;
-  final String userInitials;
   final VoidCallback onClose;
   final void Function(String subject, String bodyPlain, List<dynamic> bodyDelta)
   onPost;
@@ -65,7 +63,7 @@ class _MessageComposerState extends State<MessageComposer> {
       try {
         return Document.fromJson(delta);
       } catch (_) {
-        // Fallback to plain text when persisted delta is invalid.
+        // fallback to plain text when delta is invalid
       }
     }
     return Document()..insert(0, widget.initialBody);
@@ -90,7 +88,7 @@ class _MessageComposerState extends State<MessageComposer> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDark
-              ? colors.outline.withOpacity(0.65)
+              ? colors.outline.withValues(alpha: 0.65)
               : colors.outlineVariant,
         ),
       ),
@@ -98,12 +96,12 @@ class _MessageComposerState extends State<MessageComposer> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildHeader(context),
-          Divider(height: 1, color: colors.outlineVariant.withOpacity(0.6)),
+          Divider(height: 1, color: colors.outlineVariant.withValues(alpha: 0.6)),
           _buildSubjectField(context),
-          Divider(height: 1, color: colors.outlineVariant.withOpacity(0.5)),
+          Divider(height: 1, color: colors.outlineVariant.withValues(alpha: 0.5)),
           _buildMessageBody(context),
           _buildToolbar(context),
-          Divider(height: 1, color: colors.outlineVariant.withOpacity(0.6)),
+          Divider(height: 1, color: colors.outlineVariant.withValues(alpha: 0.6)),
           _buildFooter(context),
         ],
       ),
@@ -111,21 +109,31 @@ class _MessageComposerState extends State<MessageComposer> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final user = context.watch<AuthNotifier>().currentUser;
+    final userName = user?.fullName ?? '';
+    final userInitials = _buildInitials(userName);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       child: Row(
         children: [
           CircleAvatar(
             radius: 12,
+            backgroundColor: colors.primaryContainer,
             child: Text(
-              widget.userInitials,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              userInitials,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: colors.onPrimaryContainer,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              widget.userName,
+              userName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(
@@ -274,5 +282,19 @@ class _MessageComposerState extends State<MessageComposer> {
         ],
       ),
     );
+  }
+
+  String _buildInitials(String name) {
+    final words = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return '?';
+    if (words.length == 1) {
+      final w = words.first.toUpperCase();
+      return w.length >= 2 ? w.substring(0, 2) : w;
+    }
+    return '${words.first[0]}${words[1][0]}'.toUpperCase();
   }
 }
