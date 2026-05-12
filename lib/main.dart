@@ -18,6 +18,10 @@ import 'features/classroom/classroom_providers.dart';
 import 'features/classroom/presentation/controllers/classroom_notifier.dart';
 import 'services/api_client.dart';
 import 'services/auth_storage.dart';
+import 'features/files/data/files_repository.dart';
+import 'features/files/providers/files_provider.dart';
+import 'features/posts/data/posts_repository.dart';
+import 'features/posts/providers/posts_provider.dart';
 import 'features/session/data/session_api.dart';
 import 'features/session/data/session_repository.dart';
 import 'features/session/providers/session_provider.dart';
@@ -71,6 +75,12 @@ Future<void> main() async {
             SessionService(SessionRepository(SessionApi(apiClient.dio))),
           ),
         ),
+        ChangeNotifierProvider<PostsProvider>(
+          create: (_) => PostsProvider(PostsRepository(apiClient.dio)),
+        ),
+        ChangeNotifierProvider<FilesProvider>(
+          create: (_) => FilesProvider(FilesRepository(apiClient.dio)),
+        ),
         Provider<SttService>.value(value: sttService),
       ],
       child: EducationDesktopApp(
@@ -101,7 +111,7 @@ void _suppressKnownWebRtcErrors() {
 }
 
 Future<void> _configureDesktopWindow() async {
-  const _flavor = String.fromEnvironment('APP_FLAVOR');
+  const flavor = String.fromEnvironment('APP_FLAVOR');
   if (!(Platform.isLinux || Platform.isWindows || Platform.isMacOS)) {
     return;
   }
@@ -113,9 +123,9 @@ Future<void> _configureDesktopWindow() async {
       minimumSize: minWindowSize,
       size: Size(1360, 860),
       center: true,
-      title: _flavor == ''
+      title: flavor == ''
           ? 'Education Desktop UI'
-          : 'Education Desktop UI $_flavor',
+          : 'Education Desktop UI $flavor',
     );
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
