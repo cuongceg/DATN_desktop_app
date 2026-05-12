@@ -51,21 +51,29 @@ class StudentDashboardScreen extends StatelessWidget {
               child: SearchBar(
                 leading: const Icon(Icons.search, color: AppColors.outline),
                 hintText: 'Search classes, students, or resources...',
-                hintStyle: WidgetStatePropertyAll(AppTextStyles.bodyLarge.copyWith(color: AppColors.outline)),
+                hintStyle: WidgetStatePropertyAll(
+                  AppTextStyles.bodyLarge.copyWith(color: AppColors.outline),
+                ),
                 elevation: const WidgetStatePropertyAll(0),
                 backgroundColor: WidgetStatePropertyAll(
-                  isLight ? AppColors.white : AppColors.surfaceContainer.withValues(alpha: 0.1)
+                  isLight
+                      ? AppColors.white
+                      : AppColors.surfaceContainer.withValues(alpha: 0.1),
                 ),
                 shape: WidgetStatePropertyAll(
                   RoundedRectangleBorder(
                     borderRadius: AppSizes.brFull,
                     side: BorderSide(
-                      color: isLight ? AppColors.luminousBorder : Colors.white.withValues(alpha: 0.1),
+                      color: isLight
+                          ? AppColors.luminousBorder
+                          : Colors.white.withValues(alpha: 0.1),
                       width: 1,
                     ),
                   ),
                 ),
-                padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSizes.md)),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: AppSizes.md),
+                ),
               ),
             ),
             const SizedBox(width: AppSizes.md),
@@ -82,8 +90,8 @@ class StudentDashboardScreen extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
-                  )
-                ]
+                  ),
+                ],
               ),
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
@@ -102,13 +110,20 @@ class StudentDashboardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSizes.lg),
-            const Icon(Icons.notifications_none, color: AppColors.onSurfaceVariant),
+            const Icon(
+              Icons.notifications_none,
+              color: AppColors.onSurfaceVariant,
+            ),
             const SizedBox(width: AppSizes.md),
             PopupMenuButton<_HeaderMenuAction>(
               tooltip: 'Tùy chọn tài khoản',
               onSelected: (action) {
                 if (action == _HeaderMenuAction.toggleTheme) {
-                  onThemeToggle(currentThemeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light);
+                  onThemeToggle(
+                    currentThemeMode == ThemeMode.light
+                        ? ThemeMode.dark
+                        : ThemeMode.light,
+                  );
                   return;
                 }
                 onLogout();
@@ -141,14 +156,19 @@ class StudentDashboardScreen extends StatelessWidget {
         const SizedBox(height: AppSizes.xl),
 
         // Welcome Section
-        Text('Welcome back, Student', style: AppTextStyles.displayLarge.copyWith(
-          color: isLight ? AppColors.onSurface : Colors.white,
-        )),
+        Text(
+          'Welcome back, Student',
+          style: AppTextStyles.displayLarge.copyWith(
+            color: isLight ? AppColors.onSurface : Colors.white,
+          ),
+        ),
         const SizedBox(height: AppSizes.xs),
         Text(
-          'You have ${classrooms.length} active classes for the Spring 2024 semester.',
+          'You have ${classrooms.length} active classes for this semester.',
           style: AppTextStyles.bodyLarge.copyWith(
-            color: isLight ? AppColors.onSurfaceVariant : AppColors.outlineVariant,
+            color: isLight
+                ? AppColors.onSurfaceVariant
+                : AppColors.outlineVariant,
           ),
         ),
         const SizedBox(height: AppSizes.xl),
@@ -390,4 +410,3 @@ class _EmptyState extends StatelessWidget {
 }
 
 enum _HeaderMenuAction { toggleTheme, logout }
-

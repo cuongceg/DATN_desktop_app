@@ -232,7 +232,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         ),
         const SizedBox(height: AppSizes.xs),
         Text(
-          'You have ${classrooms.length} classes for the 2026.2 semester.',
+          'You have ${classrooms.length} classes for this semester.',
           style: AppTextStyles.bodyLarge.copyWith(
             color: isLight
                 ? AppColors.onSurfaceVariant

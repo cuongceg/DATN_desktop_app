@@ -652,7 +652,7 @@ class _AddStudentsPanelState extends State<_AddStudentsPanel> {
 
     return ListView.separated(
       itemCount: notifier.searchResults.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSizes.md),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSizes.md),
       itemBuilder: (context, index) {
         final user = notifier.searchResults[index];
         final isExisting = notifier.existingMembers.any(
@@ -698,7 +698,7 @@ class _AddStudentsPanelState extends State<_AddStudentsPanel> {
         Expanded(
           child: ListView.separated(
             itemCount: notifier.existingMembers.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSizes.md),
+            separatorBuilder: (_, _) => const SizedBox(height: AppSizes.md),
             itemBuilder: (context, index) {
               final member = notifier.existingMembers[index];
               final isPendingRemove = notifier.membersToRemove.contains(
