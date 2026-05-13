@@ -15,6 +15,7 @@ import '../widgets/create_classroom_dialog_widget.dart';
 import '../widgets/teacher_classroom_card_widget.dart';
 import '../../domain/entities/classroom_entity.dart';
 import '../../../../../screens/class_management/teams_channel_screen.dart';
+import '../../../../../models/classroom.dart';
 
 /// Dashboard screen for teachers.
 ///
@@ -568,7 +569,9 @@ class _ClassroomGrid extends StatelessWidget {
         builder: (_) => TeamsChannelScreen(
           classId: classroom.id,
           initialTeam: classroom.name,
-          availableTeams: availableTeams,
+          availableClasses: classrooms
+              .map((c) => Classroom(id: c.id, name: c.name))
+              .toList(growable: false),
           isTeacher: true,
           currentThemeMode: currentThemeMode,
           onThemeToggle: onThemeToggle,

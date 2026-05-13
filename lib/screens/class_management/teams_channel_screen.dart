@@ -8,6 +8,7 @@ import 'package:flutter_web_rtc/widgets/post_card.dart';
 import 'package:flutter_web_rtc/widgets/message_composer.dart';
 import '../../features/session/screens/join_screen.dart';
 import '../../features/session/providers/session_provider.dart';
+import '../../models/classroom.dart';
 
 class TeamsChannelScreen extends StatefulWidget {
   const TeamsChannelScreen({
@@ -17,14 +18,14 @@ class TeamsChannelScreen extends StatefulWidget {
     required this.isTeacher,
     required this.currentThemeMode,
     required this.onThemeToggle,
-    this.availableTeams = const <String>[],
+    this.availableClasses = const <Classroom>[],
   });
 
   /// UUID của lớp học — dùng để gọi API tạo/join session.
   final String classId;
   final bool isTeacher;
   final String initialTeam;
-  final List<String> availableTeams;
+  final List<Classroom> availableClasses;
   final ThemeMode currentThemeMode;
   final ValueChanged<ThemeMode> onThemeToggle;
 
@@ -33,9 +34,9 @@ class TeamsChannelScreen extends StatefulWidget {
 }
 
 class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
-  late final List<String> _teams;
+  late final List<Classroom> _classes;
   final ScrollController _postsScrollController = ScrollController();
-  late String _selectedTeam;
+  late Classroom _selectedClass;
   bool _isComposerVisible = false;
   bool _showNewPostIndicator = false;
   bool _isMeetLoading = false;
@@ -44,15 +45,36 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
   String _composerInitialBody = '';
   List<dynamic>? _composerInitialBodyDelta;
 
+  Future<void> _selectClass(Classroom classroom) async {
+    if (classroom.id == _selectedClass.id) return;
+
+    setState(() {
+      _selectedClass = classroom;
+      _isComposerVisible = false;
+      _showNewPostIndicator = false;
+      _editingPostId = null;
+      _composerInitialSubject = '';
+      _composerInitialBody = '';
+      _composerInitialBodyDelta = null;
+    });
+
+    await context
+        .read<PostsProvider>()
+        .fetchPosts(_selectedClass.id, refresh: true);
+  }
+
   @override
   void initState() {
     super.initState();
-    _teams = _buildTeams(widget.initialTeam, widget.availableTeams);
-    _selectedTeam = widget.initialTeam;
+    _classes = _buildClasses(widget.classId, widget.initialTeam, widget.availableClasses);
+    _selectedClass = _classes.firstWhere(
+      (c) => c.id == widget.classId,
+      orElse: () => Classroom(id: widget.classId, name: widget.initialTeam),
+    );
     _postsScrollController.addListener(_onPostsScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<PostsProvider>().fetchPosts(widget.classId);
+        context.read<PostsProvider>().fetchPosts(_selectedClass.id);
       }
     });
   }
@@ -70,7 +92,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
     if (pos.pixels >= pos.maxScrollExtent * 0.9) {
       final provider = context.read<PostsProvider>();
       if (!provider.isLoadingMore && provider.hasMore) {
-        provider.loadMorePosts(widget.classId);
+        provider.loadMorePosts(_selectedClass.id);
       }
     }
   }
@@ -109,7 +131,8 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                         children: [
                           _buildPostsPane(horizontalInset),
                           DocumentManagementScreen(
-                            classId: widget.classId,
+                            key: ValueKey<String>('docs-${_selectedClass.id}'),
+                            classId: _selectedClass.id,
                             isTeacher: widget.isTeacher,
                             currentThemeMode: widget.currentThemeMode,
                             onThemeToggle: widget.onThemeToggle,
@@ -129,8 +152,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
   }
 
   Widget _buildPostsPane(double horizontalInset) {
-    final currentUserId =
-        context.read<AuthNotifier>().currentUser?.id ?? '';
+    final currentUserId = context.read<AuthNotifier>().currentUser?.id ?? '';
 
     return Consumer<PostsProvider>(
       builder: (context, provider, _) {
@@ -145,15 +167,15 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
               ),
               child: Column(
                 children: [
-                  Expanded(
-                    child: _buildPostsList(provider, currentUserId),
-                  ),
+                  Expanded(child: _buildPostsList(provider, currentUserId)),
                   if (_isComposerVisible)
                     MessageComposer(
                       initialSubject: _composerInitialSubject,
                       initialBody: _composerInitialBody,
                       initialBodyDelta: _composerInitialBodyDelta,
-                      postButtonLabel: _editingPostId == null ? 'Post' : 'Update',
+                      postButtonLabel: _editingPostId == null
+                          ? 'Post'
+                          : 'Update',
                       onClose: _closeComposer,
                       onPost: (s, b, d) {
                         _handlePost(s, b, d);
@@ -194,9 +216,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
     final colors = Theme.of(context).colorScheme;
 
     if (provider.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: colors.primary),
-      );
+      return Center(child: CircularProgressIndicator(color: colors.primary));
     }
 
     if (provider.errorMessage != null) {
@@ -211,9 +231,10 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => context
-                  .read<PostsProvider>()
-                  .fetchPosts(widget.classId, refresh: true),
+              onPressed: () => context.read<PostsProvider>().fetchPosts(
+                _selectedClass.id,
+                refresh: true,
+              ),
               child: const Text('Thử lại'),
             ),
           ],
@@ -278,7 +299,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
       );
     } else {
       final newPost = await provider.createPost(
-        classId: widget.classId,
+        classId: _selectedClass.id,
         title: subject.isEmpty ? null : subject,
         bodyDelta: deltaMap,
         bodyPlain: bodyPlain,
@@ -373,7 +394,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
   // ─── TASK-UI-20: classId hợp lệ từ widget (TASK-UI-20 đã done) ───────────────────────────
 
   /// Trả về classId UUID thật từ widget.classId.
-  String _getCurrentClassId() => widget.classId;
+  String _getCurrentClassId() => _selectedClass.id;
 
   Future<void> _handleMeetNow(BuildContext context) async {
     setState(() => _isMeetLoading = true);
@@ -382,9 +403,16 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
 
     try {
       // Bước 1: Tạo session mới
-      final session = await sessionProvider.createSession(classId, 'Buổi học nhanh');
+      final session = await sessionProvider.createSession(
+        classId,
+        'Buổi học nhanh',
+      );
       if (session == null) {
-        if (context.mounted) _showError(context, sessionProvider.errorMessage ?? 'Không thể tạo buổi học');
+        if (context.mounted)
+          _showError(
+            context,
+            sessionProvider.errorMessage ?? 'Không thể tạo buổi học',
+          );
         return;
       }
 
@@ -394,7 +422,11 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
       // Bước 3: Lấy token LiveKit
       final joinData = await sessionProvider.joinSession(session.id);
       if (joinData == null) {
-        if (context.mounted) _showError(context, sessionProvider.errorMessage ?? 'Không lấy được token');
+        if (context.mounted)
+          _showError(
+            context,
+            sessionProvider.errorMessage ?? 'Không lấy được token',
+          );
         return;
       }
 
@@ -466,8 +498,11 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                     if (time == null) return;
                     setStateDialog(() {
                       selectedDateTime = DateTime(
-                        date.year, date.month, date.day,
-                        time.hour, time.minute,
+                        date.year,
+                        date.month,
+                        date.day,
+                        time.hour,
+                        time.minute,
                       );
                     });
                   },
@@ -481,7 +516,8 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
               child: const Text('Huỷ'),
             ),
             FilledButton(
-              onPressed: titleController.text.isEmpty || selectedDateTime == null
+              onPressed:
+                  titleController.text.isEmpty || selectedDateTime == null
                   ? null
                   : () => Navigator.of(dialogCtx).pop(true),
               child: const Text('Tạo lịch'),
@@ -503,7 +539,10 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
       );
       if (!context.mounted) return;
       if (session == null) {
-        _showError(context, sessionProvider.errorMessage ?? 'Không thể tạo lịch');
+        _showError(
+          context,
+          sessionProvider.errorMessage ?? 'Không thể tạo lịch',
+        );
         return;
       }
       final dt = selectedDateTime!;
@@ -545,7 +584,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
       title: Row(
         children: [
           Text(
-            _selectedTeam,
+            _selectedClass.name,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -610,7 +649,9 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colors.primary,
                     side: BorderSide(color: colors.outlineVariant),
-                    disabledForegroundColor: colors.primary.withValues(alpha: 0.9),
+                    disabledForegroundColor: colors.primary.withValues(
+                      alpha: 0.9,
+                    ),
                     disabledIconColor: colors.primary.withValues(alpha: 0.9),
                   ),
                 ),
@@ -672,31 +713,21 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Text(
-                  'Teams',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () {},
-                  tooltip: 'Join or create team',
-                  icon: const Icon(Icons.add),
-                ),
-              ],
+            child: Text(
+              'Teams',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              itemCount: _teams.length,
+              itemCount: _classes.length,
               separatorBuilder: (context, index) => const SizedBox(height: 4),
               itemBuilder: (context, index) {
-                final team = _teams[index];
-                final isSelected = team == _selectedTeam;
+                final classroom = _classes[index];
+                final isSelected = classroom.id == _selectedClass.id;
 
                 return ListTile(
                   dense: true,
@@ -707,7 +738,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                         ? colors.primary
                         : colors.surfaceContainerHighest,
                     child: Text(
-                      _buildTeamInitials(team),
+                      _buildClassInitials(classroom.name),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -718,7 +749,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                     ),
                   ),
                   title: Text(
-                    team,
+                    classroom.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -734,9 +765,7 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
                     alpha: 0.45,
                   ),
                   onTap: () {
-                    setState(() {
-                      _selectedTeam = team;
-                    });
+                    _selectClass(classroom);
                   },
                 );
               },
@@ -747,25 +776,34 @@ class _TeamsChannelScreenState extends State<TeamsChannelScreen> {
     );
   }
 
-  List<String> _buildTeams(String initialTeam, List<String> availableTeams) {
-    final teams = availableTeams
-        .where((team) => team.trim().isNotEmpty)
-        .toSet()
-        .toList(growable: true);
+  List<Classroom> _buildClasses(
+    String currentClassId,
+    String currentClassName,
+    List<Classroom> availableClasses,
+  ) {
+    final uniqueById = <String, Classroom>{
+      for (final c in availableClasses)
+        if (c.id.trim().isNotEmpty && c.name.trim().isNotEmpty) c.id: c,
+    };
 
-    if (!teams.contains(initialTeam)) {
-      teams.insert(0, initialTeam);
-    }
-    if (teams.isEmpty) {
-      teams.add(initialTeam);
-    }
-    return teams.toSet().toList(growable: false);
+    uniqueById.putIfAbsent(
+      currentClassId,
+      () => Classroom(id: currentClassId, name: currentClassName),
+    );
+
+    final result = uniqueById.values.toList(growable: false);
+    result.sort((a, b) {
+      if (a.id == currentClassId) return -1;
+      if (b.id == currentClassId) return 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return result;
   }
 
-  String _buildTeamInitials(String value) {
+  String _buildClassInitials(String value) {
     final words = value.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
     if (words.isEmpty) {
-      return 'TM';
+      return 'CL';
     }
     final items = words.toList(growable: false);
     if (items.length == 1) {
