@@ -65,14 +65,21 @@ class ParticipantsPanel extends StatelessWidget {
                         itemBuilder: (context, i) {
                           final ap = apiParts[i];
                           final lp = _findLive(ap.userId, liveParts);
-                          return _ApiTile(apiPart: ap, livePart: lp);
+                          return _ApiTile(
+                            apiPart: ap,
+                            livePart: lp,
+                            isSttOn: provider.isSttOn,
+                          );
                         },
                       )
                     : ListView.builder(
                         itemCount: liveParts.length,
                         itemBuilder: (context, i) {
                           final p = liveParts[i];
-                          return _LiveKitTile(participant: p);
+                          return _LiveKitTile(
+                            participant: p,
+                            isSttOn: provider.isSttOn,
+                          );
                         },
                       ),
               ),
@@ -85,17 +92,21 @@ class ParticipantsPanel extends StatelessWidget {
 }
 
 class _ApiTile extends StatelessWidget {
-  const _ApiTile({required this.apiPart, required this.livePart});
+  const _ApiTile({
+    required this.apiPart,
+    required this.livePart,
+    required this.isSttOn,
+  });
 
   final SessionParticipantModel apiPart;
   final Participant? livePart;
+  final bool isSttOn;
 
   @override
   Widget build(BuildContext context) {
     final isTeacher = apiPart.role == 'teacher';
     final initial =
         apiPart.fullName.isNotEmpty ? apiPart.fullName[0].toUpperCase() : '?';
-    final isMicOn = livePart?.isMicrophoneEnabled() ?? false;
     final isCamOn = livePart?.isCameraEnabled() ?? false;
 
     return ListTile(
@@ -123,9 +134,9 @@ class _ApiTile extends StatelessWidget {
           const SizedBox(width: 6),
           if (livePart != null) ...[
             Icon(
-              isMicOn ? Icons.mic : Icons.mic_off,
+              isSttOn ? Icons.closed_caption : Icons.closed_caption_outlined,
               size: 20,
-              color: isMicOn ? Colors.white : Colors.red,
+              color: isSttOn ? Colors.white : Colors.grey,
             ),
             const SizedBox(width: 4),
             Icon(
@@ -141,13 +152,13 @@ class _ApiTile extends StatelessWidget {
 }
 
 class _LiveKitTile extends StatelessWidget {
-  const _LiveKitTile({required this.participant});
+  const _LiveKitTile({required this.participant, required this.isSttOn});
 
   final Participant participant;
+  final bool isSttOn;
 
   @override
   Widget build(BuildContext context) {
-    final isMicOn = participant.isMicrophoneEnabled();
     final isCamOn = participant.isCameraEnabled();
     final initial = participant.name.isNotEmpty ? participant.name[0] : '?';
 
@@ -161,9 +172,9 @@ class _LiveKitTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            isMicOn ? Icons.mic : Icons.mic_off,
+            isSttOn ? Icons.closed_caption : Icons.closed_caption_outlined,
             size: 20,
-            color: isMicOn ? Colors.white : Colors.red,
+            color: isSttOn ? Colors.white : Colors.grey,
           ),
           const SizedBox(width: 8),
           Icon(

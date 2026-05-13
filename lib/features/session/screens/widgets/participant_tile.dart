@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/glass_theme.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../providers/meeting_room_provider.dart';
 
 class ParticipantTile extends StatefulWidget {
   final Participant participant;
@@ -52,16 +54,20 @@ class _ParticipantTileState extends State<ParticipantTile> {
     final isCamEnabled = widget.participant.isCameraEnabled();
     final videoTrack = isCamEnabled
         ? widget.participant.videoTrackPublications
-            .where((p) => p.kind == TrackType.VIDEO)
-            .firstOrNull
-            ?.track as VideoTrack?
+                  .where((p) => p.kind == TrackType.VIDEO)
+                  .firstOrNull
+                  ?.track
+              as VideoTrack?
         : null;
 
     final isSpeaking = widget.participant.isSpeaking;
-    final isMicOn = widget.participant.isMicrophoneEnabled();
+    final isSttOn = context.watch<MeetingRoomProvider>().isSttOn;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final name = widget.displayName ??
-        (widget.participant.name.isNotEmpty ? widget.participant.name : 'Unknown');
+    final name =
+        widget.displayName ??
+        (widget.participant.name.isNotEmpty
+            ? widget.participant.name
+            : 'Unknown');
 
     return GestureDetector(
       onTap: widget.onPin,
@@ -110,7 +116,10 @@ class _ParticipantTileState extends State<ParticipantTile> {
                 bottom: 8,
                 left: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
@@ -119,14 +128,17 @@ class _ParticipantTileState extends State<ParticipantTile> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isMicOn ? Icons.mic : Icons.mic_off,
-                        color: isMicOn ? Colors.white : Colors.red,
+                        isSttOn ? Icons.mic : Icons.mic_off,
+                        color: isSttOn ? Colors.green : Colors.red,
                         size: 16,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         name,
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),

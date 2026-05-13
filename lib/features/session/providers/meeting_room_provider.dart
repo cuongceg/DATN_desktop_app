@@ -11,6 +11,7 @@ class MeetingRoomProvider extends ChangeNotifier {
   bool isChatOpen = false;
   bool isParticipantsOpen = false;
   bool isScreenShareOn = false;
+  bool isSttOn = false;
   LocalVideoTrack? screenShareTrack;
   VideoTrack? remoteScreenShareTrack;
   String remoteScreenSharerName = '';
@@ -172,6 +173,11 @@ class MeetingRoomProvider extends ChangeNotifier {
     notifyListeners();
     await room?.localParticipant?.setCameraEnabled(isCamOn);
     isCamBusy = false;
+    notifyListeners();
+  }
+
+  void setSttState(bool value) {
+    isSttOn = value;
     notifyListeners();
   }
 

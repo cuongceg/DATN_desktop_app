@@ -19,10 +19,18 @@ class BottomToolbar extends StatelessWidget {
   /// `true` nếu người dùng là giáo viên → hiện thêm tùy chọn "Kết thúc buổi học".
   final bool isTeacher;
 
+  /// Whether STT subtitle broadcast is currently active (teacher only).
+  final bool isSttOn;
+
+  /// Callback to toggle STT on/off. Only provided for teacher; null for student.
+  final VoidCallback? onToggleStt;
+
   const BottomToolbar({
     super.key,
     required this.sessionId,
     required this.isTeacher,
+    this.isSttOn = false,
+    this.onToggleStt,
   });
 
   @override
@@ -35,11 +43,11 @@ class BottomToolbar extends StatelessWidget {
           children: [
             if (isTeacher) ...[
               _ToolbarButton(
-                icon: provider.isMicOn ? Icons.mic : Icons.mic_off,
-                label: provider.isMicOn ? 'Tắt Mic' : 'Bật Mic',
-                onTap: provider.toggleMic,
-                isActive: provider.isMicOn,
-                inactiveColor: Colors.red,
+                icon: isSttOn ? Icons.mic : Icons.mic_off,
+                label: isSttOn ? 'Tắt micro' : 'Bật micro ',
+                onTap: onToggleStt ?? () {},
+                isActive: isSttOn,
+                activeColor: Colors.red,
               ),
               const SizedBox(width: 16),
             ],
@@ -55,7 +63,9 @@ class BottomToolbar extends StatelessWidget {
               icon: provider.isScreenShareOn
                   ? Icons.stop_screen_share
                   : Icons.screen_share,
-              label: provider.isScreenShareOn ? 'Dừng chia sẻ' : 'Chia sẻ màn hình',
+              label: provider.isScreenShareOn
+                  ? 'Dừng chia sẻ'
+                  : 'Chia sẻ màn hình',
               onTap: provider.isScreenShareOn
                   ? () => _disableScreenShare(context, provider)
                   : () => _handleScreenShare(context, provider),
@@ -92,7 +102,9 @@ class BottomToolbar extends StatelessWidget {
 }
 
 Future<void> _handleScreenShare(
-    BuildContext context, MeetingRoomProvider provider) async {
+  BuildContext context,
+  MeetingRoomProvider provider,
+) async {
   if (provider.room?.localParticipant == null) return;
 
   // ── Wayland-only guard (Linux only) ────────────────────────────────────────
@@ -140,8 +152,10 @@ Future<void> _handleScreenShare(
       await provider.room!.localParticipant!.publishVideoTrack(track);
       provider.startScreenShare(track);
     } else {
-      await provider.room!.localParticipant!
-          .setScreenShareEnabled(true, captureScreenAudio: true);
+      await provider.room!.localParticipant!.setScreenShareEnabled(
+        true,
+        captureScreenAudio: true,
+      );
     }
   } on PlatformException catch (e) {
     debugPrint('Screen share PlatformException: ${e.code} — ${e.message}');
@@ -169,7 +183,9 @@ Future<void> _handleScreenShare(
 }
 
 Future<void> _disableScreenShare(
-    BuildContext context, MeetingRoomProvider provider) async {
+  BuildContext context,
+  MeetingRoomProvider provider,
+) async {
   try {
     await provider.room?.localParticipant?.setScreenShareEnabled(false);
   } catch (e) {
@@ -250,7 +266,8 @@ class _TeacherEndCallButton extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Cảnh báo: ${e.toString().replaceAll('Exception: ', '')}'),
+              'Cảnh báo: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
@@ -302,8 +319,10 @@ class _StudentLeaveButton extends StatelessWidget {
               await provider.disconnect();
               if (context.mounted) Navigator.pop(context);
             },
-            child:
-                const Text('Rời phòng', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Rời phòng',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -334,7 +353,8 @@ class _ToolbarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color color;
     if (isActive) {
-      color = activeColor ??
+      color =
+          activeColor ??
           (Theme.of(context).brightness == Brightness.dark
               ? Colors.white
               : Colors.black87);

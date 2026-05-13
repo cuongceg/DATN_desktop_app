@@ -54,7 +54,9 @@ class _JoinScreenState extends State<JoinScreen> {
   }
 
   Future<void> _initStateAsync() async {
-    _subscription = Hardware.instance.onDeviceChange.stream.listen(_loadDevices);
+    _subscription = Hardware.instance.onDeviceChange.stream.listen(
+      _loadDevices,
+    );
     final devices = await Hardware.instance.enumerateDevices();
     await _loadDevices(devices);
   }
@@ -71,14 +73,16 @@ class _JoinScreenState extends State<JoinScreen> {
     _audioInputs = devices.where((d) => d.kind == 'audioinput').toList();
     _videoInputs = devices.where((d) => d.kind == 'videoinput').toList();
 
-    if (_selectedAudioDevice != null && !_audioInputs.contains(_selectedAudioDevice)) {
+    if (_selectedAudioDevice != null &&
+        !_audioInputs.contains(_selectedAudioDevice)) {
       _selectedAudioDevice = null;
     }
     if (_audioInputs.isEmpty) {
       await _audioTrack?.stop();
       _audioTrack = null;
     }
-    if (_selectedVideoDevice != null && !_videoInputs.contains(_selectedVideoDevice)) {
+    if (_selectedVideoDevice != null &&
+        !_videoInputs.contains(_selectedVideoDevice)) {
       _selectedVideoDevice = null;
     }
     if (_videoInputs.isEmpty) {
@@ -231,7 +235,9 @@ class _JoinScreenState extends State<JoinScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? GlassTheme.darkBackground : GlassTheme.lightBackground,
+      backgroundColor: isDark
+          ? GlassTheme.darkBackground
+          : GlassTheme.lightBackground,
       appBar: AppBar(
         title: Text(
           'Chuẩn bị tham gia: ${widget.sessionTitle}',
@@ -262,10 +268,14 @@ class _JoinScreenState extends State<JoinScreen> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.black87,
-                          borderRadius: BorderRadius.circular(GlassTheme.cardRadius),
+                          borderRadius: BorderRadius.circular(
+                            GlassTheme.cardRadius,
+                          ),
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(GlassTheme.cardRadius),
+                          borderRadius: BorderRadius.circular(
+                            GlassTheme.cardRadius,
+                          ),
                           child: _videoTrack != null
                               ? VideoTrackRenderer(
                                   _videoTrack!,
@@ -276,7 +286,8 @@ class _JoinScreenState extends State<JoinScreen> {
                                     builder: (ctx, constraints) => Icon(
                                       Icons.videocam_off,
                                       color: GlassTheme.accent,
-                                      size: math.min(
+                                      size:
+                                          math.min(
                                             constraints.maxHeight,
                                             constraints.maxWidth,
                                           ) *
@@ -293,7 +304,10 @@ class _JoinScreenState extends State<JoinScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Camera:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const Text(
+                        'Camera:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       Switch(
                         value: _enableVideo,
                         onChanged: _setEnableVideo,
@@ -316,17 +330,19 @@ class _JoinScreenState extends State<JoinScreen> {
                         ),
                         items: _enableVideo
                             ? _videoInputs
-                                .map(
-                                  (d) => DropdownMenuItem<MediaDevice>(
-                                    value: d,
-                                    child: Text(
-                                      d.label.isNotEmpty ? d.label : 'Camera ${_videoInputs.indexOf(d) + 1}',
-                                      style: const TextStyle(fontSize: 14),
-                                      overflow: TextOverflow.ellipsis,
+                                  .map(
+                                    (d) => DropdownMenuItem<MediaDevice>(
+                                      value: d,
+                                      child: Text(
+                                        d.label.isNotEmpty
+                                            ? d.label
+                                            : 'Camera ${_videoInputs.indexOf(d) + 1}',
+                                        style: const TextStyle(fontSize: 14),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                )
-                                .toList()
+                                  )
+                                  .toList()
                             : [],
                         value: _selectedVideoDevice,
                         onChanged: _enableVideo
@@ -342,7 +358,9 @@ class _JoinScreenState extends State<JoinScreen> {
                           color: isDark ? Colors.white : Colors.black87,
                           fontSize: 14,
                         ),
-                        dropdownColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+                        dropdownColor: isDark
+                            ? const Color(0xFF1E1E2E)
+                            : Colors.white,
                       ),
                     ),
                   ),
@@ -355,22 +373,23 @@ class _JoinScreenState extends State<JoinScreen> {
                         child: DropdownButton<VideoParameters>(
                           isExpanded: true,
                           hint: const Text('Chọn độ phân giải'),
-                          items: [
-                            VideoParametersPresets.h480_43,
-                            VideoParametersPresets.h540_169,
-                            VideoParametersPresets.h720_169,
-                            VideoParametersPresets.h1080_169,
-                          ]
-                              .map(
-                                (p) => DropdownMenuItem<VideoParameters>(
-                                  value: p,
-                                  child: Text(
-                                    '${p.dimensions.width}x${p.dimensions.height}',
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                          items:
+                              [
+                                    VideoParametersPresets.h480_43,
+                                    VideoParametersPresets.h540_169,
+                                    VideoParametersPresets.h720_169,
+                                    VideoParametersPresets.h1080_169,
+                                  ]
+                                  .map(
+                                    (p) => DropdownMenuItem<VideoParameters>(
+                                      value: p,
+                                      child: Text(
+                                        '${p.dimensions.width}x${p.dimensions.height}',
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                           value: _selectedVideoParameters,
                           onChanged: (VideoParameters? value) async {
                             if (value != null) {
@@ -383,7 +402,9 @@ class _JoinScreenState extends State<JoinScreen> {
                             color: isDark ? Colors.white : Colors.black87,
                             fontSize: 14,
                           ),
-                          dropdownColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+                          dropdownColor: isDark
+                              ? const Color(0xFF1E1E2E)
+                              : Colors.white,
                         ),
                       ),
                     ),
@@ -395,7 +416,10 @@ class _JoinScreenState extends State<JoinScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Microphone:', style: TextStyle(fontWeight: FontWeight.w600)),
+                        const Text(
+                          'Microphone:',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         Switch(
                           value: _enableAudio,
                           onChanged: _setEnableAudio,
@@ -418,17 +442,19 @@ class _JoinScreenState extends State<JoinScreen> {
                           ),
                           items: _enableAudio
                               ? _audioInputs
-                                  .map(
-                                    (d) => DropdownMenuItem<MediaDevice>(
-                                      value: d,
-                                      child: Text(
-                                        d.label.isNotEmpty ? d.label : 'Microphone ${_audioInputs.indexOf(d) + 1}',
-                                        style: const TextStyle(fontSize: 14),
-                                        overflow: TextOverflow.ellipsis,
+                                    .map(
+                                      (d) => DropdownMenuItem<MediaDevice>(
+                                        value: d,
+                                        child: Text(
+                                          d.label.isNotEmpty
+                                              ? d.label
+                                              : 'Microphone ${_audioInputs.indexOf(d) + 1}',
+                                          style: const TextStyle(fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                  .toList()
+                                    )
+                                    .toList()
                               : [],
                           value: _selectedAudioDevice,
                           onChanged: _enableAudio
@@ -444,7 +470,9 @@ class _JoinScreenState extends State<JoinScreen> {
                             color: isDark ? Colors.white : Colors.black87,
                             fontSize: 14,
                           ),
-                          dropdownColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+                          dropdownColor: isDark
+                              ? const Color(0xFF1E1E2E)
+                              : Colors.white,
                         ),
                       ),
                     ),

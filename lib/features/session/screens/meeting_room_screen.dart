@@ -1,13 +1,20 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
 import '../providers/meeting_room_provider.dart';
 import '../providers/session_provider.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../../core/theme/glass_theme.dart';
+import '../../stt/services/stt_service.dart';
 import 'widgets/participant_grid.dart';
 import 'widgets/bottom_toolbar.dart';
 import 'widgets/chat_panel.dart';
 import 'widgets/participants_panel.dart';
+import 'widgets/subtitle_overlay.dart';
 
 class MeetingRoomScreen extends StatefulWidget {
   final String sessionId;
@@ -26,6 +33,15 @@ class MeetingRoomScreen extends StatefulWidget {
 }
 
 class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
+  // ── Subtitle state ──────────────────────────────────────────────────────────
+  String? _subtitleText;
+  Timer? _subtitleTimer;
+  StreamSubscription<String>? _sttSub;
+  bool _isSttOn = false;
+
+  // Student-side DataChannel listener — disposed with this screen.
+  EventsListener<RoomEvent>? _dataListener;
+
   @override
   void initState() {
     super.initState();
@@ -40,7 +56,76 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
       final sessionService = context.read<SessionProvider>().service;
       provider.setSessionContext(widget.sessionId, sessionService);
       provider.fetchSessionParticipants();
+
+      // Student: listen for subtitle text broadcast by teacher via DataChannel.
+      // Subtitles are delivered via DataChannel, NOT via video — screen-share
+      // video carries no subtitle content.
+      if (!widget.isTeacher) {
+        final room = provider.room;
+        if (room != null) {
+          _dataListener = room.createListener();
+          _dataListener!.on<DataReceivedEvent>((event) {
+            if (event.topic == 'subtitles') {
+              _onSubtitleText(utf8.decode(event.data));
+            }
+          });
+        }
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _subtitleTimer?.cancel();
+    _sttSub?.cancel();
+    _dataListener?.dispose();
+    if (_isSttOn) {
+      context.read<SttService>().stop();
+    }
+    super.dispose();
+  }
+
+  // ── Shared: update subtitle text and (re)start the 5 s auto-clear timer ────
+
+  void _onSubtitleText(String text) {
+    if (!mounted) return;
+    _subtitleTimer?.cancel();
+    setState(() => _subtitleText = text);
+    _subtitleTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _subtitleText = null);
+    });
+  }
+
+  // ── Teacher: toggle STT on/off and broadcast to students ───────────────────
+
+  Future<void> _toggleStt() async {
+    final sttService = context.read<SttService>();
+    final provider = context.read<MeetingRoomProvider>();
+
+    if (_isSttOn) {
+      await _sttSub?.cancel();
+      _sttSub = null;
+      await sttService.stop();
+      _subtitleTimer?.cancel();
+      setState(() {
+        _isSttOn = false;
+        _subtitleText = null;
+      });
+      provider.setSttState(false);
+    } else {
+      _sttSub = sttService.transcriptStream.listen((text) {
+        // Show locally for self-monitoring and broadcast to students.
+        _onSubtitleText(text);
+        final data = Uint8List.fromList(utf8.encode(text));
+        provider.room?.localParticipant?.publishData(
+          data,
+          topic: 'subtitles',
+        );
+      });
+      await sttService.start();
+      setState(() => _isSttOn = true);
+      provider.setSttState(true);
+    }
   }
 
   Future<void> _stopScreenShare() async {
@@ -120,25 +205,35 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Builder(builder: (context) {
-                          final isLocalShare = provider.screenShareTrack != null;
-                          final effectiveShare = provider.screenShareTrack ??
-                              provider.remoteScreenShareTrack;
-                          return ParticipantGrid(
-                            participants: provider.participants,
-                            localParticipantSid:
-                                provider.room?.localParticipant?.sid,
-                            isLocalCamStarting:
-                                provider.isCamBusy && provider.isCamOn,
-                            screenShareTrack: effectiveShare,
-                            isLocalScreenShare: isLocalShare,
-                            screenSharerName: isLocalShare
-                                ? ''
-                                : provider.remoteScreenSharerName,
-                            onStopScreenShare:
-                                isLocalShare ? _stopScreenShare : null,
-                          );
-                        }),
+                        child: Stack(
+                          children: [
+                            Builder(builder: (context) {
+                              final isLocalShare =
+                                  provider.screenShareTrack != null;
+                              final effectiveShare =
+                                  provider.screenShareTrack ??
+                                      provider.remoteScreenShareTrack;
+                              return ParticipantGrid(
+                                participants: provider.participants,
+                                localParticipantSid:
+                                    provider.room?.localParticipant?.sid,
+                                isLocalCamStarting:
+                                    provider.isCamBusy && provider.isCamOn,
+                                screenShareTrack: effectiveShare,
+                                isLocalScreenShare: isLocalShare,
+                                screenSharerName: isLocalShare
+                                    ? ''
+                                    : provider.remoteScreenSharerName,
+                                onStopScreenShare:
+                                    isLocalShare ? _stopScreenShare : null,
+                              );
+                            }),
+                            SubtitleOverlay(
+                              subtitleText: _subtitleText,
+                              isTeacher: widget.isTeacher,
+                            ),
+                          ],
+                        ),
                       ),
                       if (provider.isChatOpen) ...[
                         const SizedBox(width: 16),
@@ -155,6 +250,8 @@ class _MeetingRoomScreenState extends State<MeetingRoomScreen> {
                 BottomToolbar(
                   sessionId: widget.sessionId,
                   isTeacher: widget.isTeacher,
+                  isSttOn: _isSttOn,
+                  onToggleStt: widget.isTeacher ? _toggleStt : null,
                 ),
               ],
             ),

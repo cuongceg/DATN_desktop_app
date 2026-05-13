@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import '../models/session_model.dart';
 import '../models/message_model.dart';
 import '../models/session_participant_model.dart';
