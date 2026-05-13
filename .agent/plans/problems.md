@@ -1,0 +1,3 @@
+There has some problems with meeting screen:
+- Like I say before, the microphone button in livekit client is not working with my computer, but for me in this project is fine because I don't need to transmit voice in the meeting over the livekit. So you can replace the mic button to the turn on cc button in the ui of meeting room now. And I want to the UI icon mic of participant tile and participant panel will be update to state on/off of the turn on cc button.
+- Secondly, when I share my screen, the UI will display like: Man hinh cua xxxxxx which xxxx is my id. Can you explain it and if I want to update the text in participant tile to the user name of the participant who is sharing screen, is it easy to update or I need to do more things?
