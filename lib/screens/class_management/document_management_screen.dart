@@ -3,19 +3,16 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../features/files/models/file_item_mapper.dart';
+import '../../features/files/models/file_node_mapper.dart';
 import '../../features/files/providers/files_provider.dart';
 import '../../models/file_item.dart';
 
 // ─── Navigation helpers ───────────────────────────────────────────────────────
 
-enum _NavLevel { root, category, folder }
-
 class _NavEntry {
-  const _NavEntry({required this.name, required this.level, this.id});
+  const _NavEntry({required this.name, required this.path});
   final String name;
-  final _NavLevel level;
-  final String? id;
+  final String path; // POSIX path e.g. "/", "/slides", "/slides/week1"
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -41,14 +38,12 @@ class DocumentManagementScreen extends StatefulWidget {
       _DocumentManagementScreenState();
 }
 
-class _DocumentManagementScreenState
-    extends State<DocumentManagementScreen> {
+class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
   List<_NavEntry> _navStack = [
-    const _NavEntry(name: 'Tài liệu', level: _NavLevel.root),
+    const _NavEntry(name: 'Tài liệu', path: '/'),
   ];
 
-  _NavLevel get _currentLevel => _navStack.last.level;
-  String? get _currentId => _navStack.last.id;
+  String get _currentPath => _navStack.last.path;
 
   @override
   void initState() {
@@ -57,7 +52,7 @@ class _DocumentManagementScreenState
       if (mounted) {
         final provider = context.read<FilesProvider>();
         provider.clearCache();
-        provider.fetchCategories(widget.classId);
+        provider.fetchContent(widget.classId, '/');
       }
     });
   }
@@ -76,11 +71,7 @@ class _DocumentManagementScreenState
             BreadcrumbWidget(
               path: _navStack
                   .map(
-                    (e) => FileItem(
-                      id: e.id ?? 'root',
-                      name: e.name,
-                      isFolder: true,
-                    ),
+                    (e) => FileItem(id: e.path, name: e.name, isFolder: true),
                   )
                   .toList(),
               onNavigate: _navigateToBreadcrumb,
@@ -141,18 +132,9 @@ class _DocumentManagementScreenState
   }
 
   List<FileItem> _getCurrentItems(FilesProvider provider) {
-    switch (_currentLevel) {
-      case _NavLevel.root:
-        return provider.categories
-            .map((c) => categoryToFileItem(c, const []))
-            .toList();
-      case _NavLevel.category:
-        final folders = provider.foldersByCategory[_currentId!] ?? const [];
-        return folders.map((f) => folderToFileItem(f, const [])).toList();
-      case _NavLevel.folder:
-        final files = provider.filesByFolder[_currentId!] ?? const [];
-        return files.map(classFileToFileItem).toList();
-    }
+    return (provider.itemsByPath[_currentPath] ?? const [])
+        .map(fileNodeToFileItem)
+        .toList();
   }
 
   // ─── Navigation ─────────────────────────────────────────────────────────────
@@ -163,38 +145,15 @@ class _DocumentManagementScreenState
     FileItem item,
   ) {
     if (item.isFolder) {
-      switch (_currentLevel) {
-        case _NavLevel.root:
-          setState(() {
-            _navStack = [
-              ..._navStack,
-              _NavEntry(
-                name: item.name,
-                level: _NavLevel.category,
-                id: item.id,
-              ),
-            ];
-          });
-          provider.fetchFolders(widget.classId, item.id, forceRefresh: true);
-          break;
-        case _NavLevel.category:
-          setState(() {
-            _navStack = [
-              ..._navStack,
-              _NavEntry(
-                name: item.name,
-                level: _NavLevel.folder,
-                id: item.id,
-              ),
-            ];
-          });
-          provider.fetchFiles(widget.classId, item.id, forceRefresh: true);
-          break;
-        case _NavLevel.folder:
-          break;
-      }
+      setState(() {
+        _navStack = [
+          ..._navStack,
+          _NavEntry(name: item.name, path: item.path),
+        ];
+      });
+      provider.fetchContent(widget.classId, item.path);
     } else {
-      _handleDownload(context, provider, item.id);
+      _handleDownload(context, provider, item.path);
     }
   }
 
@@ -202,82 +161,73 @@ class _DocumentManagementScreenState
     setState(() {
       _navStack = _navStack.sublist(0, index + 1);
     });
-
-    final provider = context.read<FilesProvider>();
-    switch (_currentLevel) {
-      case _NavLevel.root:
-        provider.fetchCategories(widget.classId);
-        break;
-      case _NavLevel.category:
-        provider.fetchFolders(widget.classId, _currentId!, forceRefresh: false);
-        break;
-      case _NavLevel.folder:
-        provider.fetchFiles(widget.classId, _currentId!, forceRefresh: false);
-        break;
-    }
+    context.read<FilesProvider>().fetchContent(widget.classId, _currentPath);
   }
 
   void _retryFetch(FilesProvider provider) {
-    switch (_currentLevel) {
-      case _NavLevel.root:
-        provider.fetchCategories(widget.classId);
-        break;
-      case _NavLevel.category:
-        provider.fetchFolders(widget.classId, _currentId!, forceRefresh: true);
-        break;
-      case _NavLevel.folder:
-        provider.fetchFiles(widget.classId, _currentId!, forceRefresh: true);
-        break;
-    }
+    provider.fetchContent(widget.classId, _currentPath, forceRefresh: true);
   }
 
   // ─── Action bar ──────────────────────────────────────────────────────────────
 
   Widget _buildActionBar(BuildContext context, FilesProvider provider) {
     final colors = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          if (widget.isTeacher) ...[
-            if (_currentLevel != _NavLevel.folder)
-              FilledButton.icon(
-                onPressed: () => _handleNew(context, provider),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(
-                  _currentLevel == _NavLevel.root
-                      ? 'Danh mục mới'
-                      : 'Thư mục mới',
+          if (widget.isTeacher)
+            PopupMenuButton<String>(
+              offset: const Offset(0, 44),
+              onSelected: (val) {
+                if (val == 'folder') _handleNew(context, provider);
+                if (val == 'upload') _handleUpload(context, provider);
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'folder',
+                  child: ListTile(
+                    leading: Icon(Icons.create_new_folder_outlined),
+                    title: Text('Thư mục mới'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'upload',
+                  enabled: !provider.isUploading,
+                  child: ListTile(
+                    leading: provider.isUploading
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colors.primary,
+                            ),
+                          )
+                        : const Icon(Icons.upload_outlined),
+                    title: Text(
+                      provider.isUploading ? 'Đang tải lên...' : 'Tải lên tệp',
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+              child: FilledButton.icon(
+                // PopupMenuButton tự xử lý tap
+                onPressed: null,
+                icon: Icon(Icons.add, size: 18, color: colors.primary),
+                label:  Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Tạo', style: TextStyle(fontSize: 14, color: colors.primary)),
+                    SizedBox(width: 4),
+                    Icon(Icons.keyboard_arrow_down, size: 16, color: colors.primary),
+                  ],
                 ),
               ),
-            if (_currentLevel == _NavLevel.folder)
-              provider.isUploading
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Đang tải lên...',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    )
-                  : FilledButton.icon(
-                      onPressed: () => _handleUpload(context, provider),
-                      icon: const Icon(Icons.upload, size: 18),
-                      label: const Text('Tải lên'),
-                    ),
-          ],
+            ),
           const Spacer(),
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: colors.onSurface),
@@ -297,18 +247,17 @@ class _DocumentManagementScreenState
     FilesProvider provider,
   ) async {
     final nameController = TextEditingController();
-    final isCategory = _currentLevel == _NavLevel.root;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: Text(isCategory ? 'Tạo danh mục mới' : 'Tạo thư mục mới'),
+            title: const Text('Tạo thư mục mới'),
             content: TextField(
               controller: nameController,
-              decoration: InputDecoration(
-                labelText: isCategory ? 'Tên danh mục' : 'Tên thư mục',
-                border: const OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: 'Tên thư mục',
+                border: OutlineInputBorder(),
               ),
               autofocus: true,
               onSubmitted: (_) => Navigator.of(ctx).pop(true),
@@ -326,16 +275,16 @@ class _DocumentManagementScreenState
           ),
     );
 
-    if (confirmed != true ||
-        nameController.text.trim().isEmpty ||
-        !context.mounted) {
+    if (confirmed != true || nameController.text.trim().isEmpty || !context.mounted) {
       return;
     }
     final name = nameController.text.trim();
-    if (isCategory) {
-      await provider.createCategory(widget.classId, name);
-    } else {
-      await provider.createFolder(widget.classId, _currentId!, name);
+    final folderPath = '$_currentPath/$name'.replaceAll('//', '/');
+    final ok = await provider.createFolder(widget.classId, folderPath);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.errorMessage ?? 'Tạo thư mục thất bại.')),
+      );
     }
   }
 
@@ -347,16 +296,18 @@ class _DocumentManagementScreenState
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
     if (file.path == null || !context.mounted) return;
-    await provider.uploadFile(
+    final filePath = '$_currentPath/${file.name}'.replaceAll('//', '/');
+    final ok = await provider.uploadFile(
       widget.classId,
-      _currentId!,
+      filePath,
       file.path!,
       file.name,
     );
-
-    // Ensure UI matches server state even if upload response parsing fails.
-    if (!context.mounted) return;
-    await provider.fetchFiles(widget.classId, _currentId!, forceRefresh: true);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.errorMessage ?? 'Tải lên thất bại.')),
+      );
+    }
   }
 
   Future<void> _handleDelete(
@@ -365,10 +316,7 @@ class _DocumentManagementScreenState
     FileItem item,
   ) async {
     final colors = Theme.of(context).colorScheme;
-    final typeName =
-        !item.isFolder
-            ? 'tệp'
-            : (_currentLevel == _NavLevel.root ? 'danh mục' : 'thư mục');
+    final typeName = item.isFolder ? 'thư mục' : 'tệp';
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -391,25 +339,20 @@ class _DocumentManagementScreenState
     );
 
     if (confirmed != true || !mounted) return;
-    switch (_currentLevel) {
-      case _NavLevel.root:
-        await provider.deleteCategory(widget.classId, item.id);
-        break;
-      case _NavLevel.category:
-        await provider.deleteFolder(widget.classId, _currentId!, item.id);
-        break;
-      case _NavLevel.folder:
-        await provider.deleteFile(widget.classId, _currentId!, item.id);
-        break;
+    final ok = await provider.deleteContent(widget.classId, item.path);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.errorMessage ?? 'Xóa thất bại.')),
+      );
     }
   }
 
   Future<void> _handleDownload(
     BuildContext context,
     FilesProvider provider,
-    String fileId,
+    String filePath,
   ) async {
-    final url = await provider.getDownloadUrl(fileId);
+    final url = await provider.getDownloadUrl(widget.classId, filePath);
     if (url == null || !context.mounted) return;
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
@@ -459,10 +402,8 @@ class BreadcrumbWidget extends StatelessWidget {
               child: Text(
                 path[pathIndex].name,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight:
-                      isLast ? FontWeight.bold : FontWeight.normal,
-                  color:
-                      isLast ? colors.onSurface : colors.onSurfaceVariant,
+                  fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
+                  color: isLast ? colors.onSurface : colors.onSurfaceVariant,
                 ),
               ),
             ),
@@ -529,9 +470,7 @@ class FileTableWidget extends StatelessWidget {
                       item.name,
                       style: TextStyle(
                         fontWeight:
-                            item.isFolder
-                                ? FontWeight.w500
-                                : FontWeight.normal,
+                            item.isFolder ? FontWeight.w500 : FontWeight.normal,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),

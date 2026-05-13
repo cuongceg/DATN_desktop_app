@@ -1,155 +1,83 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
-import '../models/category_model.dart';
-import '../models/class_file_model.dart';
-import '../models/folder_model.dart';
+import '../models/file_node_model.dart';
 
 class FilesRepository {
   const FilesRepository(this._dio);
 
   final Dio _dio;
 
-  // ─── Categories ────────────────────────────────────────────────────────────
-
-  Future<List<CategoryModel>> getCategories(String classId) async {
-    try {
-      final response = await _dio.get('/api/files/class/$classId/categories');
-      final list = response.data['categories'] as List;
-      return list
-          .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on DioException catch (e) {
-      throw Exception(_handleDioError(e));
-    }
-  }
-
-  Future<CategoryModel> createCategory(String classId, String name) async {
-    try {
-      final response = await _dio.post(
-        '/api/files/class/$classId/categories',
-        data: {'name': name},
-      );
-      return CategoryModel.fromJson(
-        response.data['category'] as Map<String, dynamic>,
-      );
-    } on DioException catch (e) {
-      throw Exception(_handleDioError(e));
-    }
-  }
-
-  Future<void> deleteCategory(String classId, String categoryId) async {
-    try {
-      await _dio.delete('/api/files/class/$classId/categories/$categoryId');
-    } on DioException catch (e) {
-      throw Exception(_handleDioError(e));
-    }
-  }
-
-  // ─── Folders ───────────────────────────────────────────────────────────────
-
-  Future<List<FolderModel>> getFolders(
-    String classId,
-    String categoryId,
-  ) async {
+  Future<List<FileNodeModel>> listContent(String classId, String path) async {
     try {
       final response = await _dio.get(
-        '/api/files/class/$classId/categories/$categoryId/folders',
+        '/api/files/class/$classId/content',
+        queryParameters: {'path': path},
       );
-      final list = response.data['folders'] as List;
-      debugPrint('folders: $list');
+      final list = response.data['items'] as List;
       return list
-          .map((e) => FolderModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } on DioException catch (e) {
-      debugPrint('folder error: ${e.toString()}');
-      throw Exception(_handleDioError(e));
-    }
-  }
-
-  Future<FolderModel> createFolder(
-    String classId,
-    String categoryId,
-    String name,
-  ) async {
-    try {
-      final response = await _dio.post(
-        '/api/files/class/$classId/categories/$categoryId/folders',
-        data: {'name': name},
-      );
-      return FolderModel.fromJson(
-        response.data['folder'] as Map<String, dynamic>,
-      );
-    } on DioException catch (e) {
-      throw Exception(_handleDioError(e));
-    }
-  }
-
-  Future<void> deleteFolder(
-    String classId,
-    String categoryId,
-    String folderId,
-  ) async {
-    try {
-      await _dio.delete(
-        '/api/files/class/$classId/categories/$categoryId/folders/$folderId',
-      );
-    } on DioException catch (e) {
-      throw Exception(_handleDioError(e));
-    }
-  }
-
-  // ─── Files ─────────────────────────────────────────────────────────────────
-
-  Future<List<ClassFileModel>> getFiles(String classId, String folderId) async {
-    try {
-      final response = await _dio.get(
-        '/api/files/class/$classId/folders/$folderId/files',
-      );
-      final list = response.data['files'] as List;
-      debugPrint('files: $list');
-      return list
-          .map((e) => ClassFileModel.fromJson(e as Map<String, dynamic>))
+          .map((e) => FileNodeModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
       throw Exception(_handleDioError(e));
     }
   }
 
-  Future<ClassFileModel> uploadFile(
+  Future<void> createFolder(String classId, String path) async {
+    try {
+      await _dio.post(
+        '/api/files/class/$classId/content',
+        data: {'type': 'folder', 'path': path},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw Exception('Tên đã tồn tại trong thư mục này.');
+      }
+      throw Exception(_handleDioError(e));
+    }
+  }
+
+  Future<void> uploadFile(
     String classId,
-    String folderId,
+    String targetPath,
     String filePath,
     String fileName,
   ) async {
     try {
       final formData = FormData.fromMap({
+        'type': 'file',
+        'path': targetPath,
         'file': await MultipartFile.fromFile(filePath, filename: fileName),
       });
-      final response = await _dio.post(
-        '/api/files/class/$classId/folders/$folderId/upload',
-        data: formData,
-      );
-      return ClassFileModel.fromJson(
-        response.data['file'] as Map<String, dynamic>,
-      );
+      await _dio.post('/api/files/class/$classId/content', data: formData);
     } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw Exception('Tên đã tồn tại trong thư mục này.');
+      }
       throw Exception(_handleDioError(e));
     }
   }
 
-  Future<String> getDownloadUrl(String fileId) async {
+  Future<String> getDownloadUrl(String classId, String path) async {
     try {
-      final response = await _dio.get('/api/files/$fileId/download-url');
+      final response = await _dio.get(
+        '/api/files/class/$classId/download',
+        queryParameters: {'path': path},
+      );
       return response.data['download_url'] as String;
     } on DioException catch (e) {
       throw Exception(_handleDioError(e));
     }
   }
 
-  Future<void> deleteFile(String fileId) async {
+  Future<void> deleteContent(String classId, String path) async {
     try {
-      await _dio.delete('/api/files/$fileId');
+      await _dio.delete(
+        '/api/files/class/$classId/content',
+        queryParameters: {'path': path},
+      );
     } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception('Thư mục không rỗng, xóa các file bên trong trước.');
+      }
       throw Exception(_handleDioError(e));
     }
   }

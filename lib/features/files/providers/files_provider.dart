@@ -1,92 +1,44 @@
 import 'package:flutter/material.dart';
 import '../data/files_repository.dart';
-import '../models/category_model.dart';
-import '../models/class_file_model.dart';
-import '../models/folder_model.dart';
+import '../models/file_node_model.dart';
 
 class FilesProvider extends ChangeNotifier {
   FilesProvider(this._repository);
 
   final FilesRepository _repository;
 
-  List<CategoryModel> _categories = [];
-  final Map<String, List<FolderModel>> _foldersByCategory = {};
-  final Map<String, List<ClassFileModel>> _filesByFolder = {};
+  final Map<String, List<FileNodeModel>> _itemsByPath = {};
   bool _isLoading = false;
   bool _isUploading = false;
   String? _errorMessage;
 
-  List<CategoryModel> get categories => _categories;
-  Map<String, List<FolderModel>> get foldersByCategory => _foldersByCategory;
-  Map<String, List<ClassFileModel>> get filesByFolder => _filesByFolder;
+  Map<String, List<FileNodeModel>> get itemsByPath => _itemsByPath;
   bool get isLoading => _isLoading;
   bool get isUploading => _isUploading;
   String? get errorMessage => _errorMessage;
 
-  /// Clears cached folders/files so subsequent navigation triggers fresh fetches.
-  void clearCache() {
-    _foldersByCategory.clear();
-    _filesByFolder.clear();
+  void clearCache() => _itemsByPath.clear();
+
+  // Returns parent path: "/slides/week1" → "/slides", "/slides" → "/"
+  String _parentOf(String path) {
+    if (path == '/') return '/';
+    final idx = path.lastIndexOf('/');
+    return idx <= 0 ? '/' : path.substring(0, idx);
   }
 
-  // ─── Categories ────────────────────────────────────────────────────────────
+  // ─── Fetch ─────────────────────────────────────────────────────────────────
 
-  Future<void> fetchCategories(String classId) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      _categories = await _repository.getCategories(classId);
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<bool> createCategory(String classId, String name) async {
-    try {
-      final created = await _repository.createCategory(classId, name);
-      _categories = [..._categories, created];
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> deleteCategory(String classId, String categoryId) async {
-    try {
-      await _repository.deleteCategory(classId, categoryId);
-      _categories = _categories.where((c) => c.id != categoryId).toList();
-      _foldersByCategory.remove(categoryId);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // ─── Folders ───────────────────────────────────────────────────────────────
-
-  /// Lazy fetch — skips API call if data already cached for [categoryId].
-  Future<void> fetchFolders(
+  Future<void> fetchContent(
     String classId,
-    String categoryId, {
+    String path, {
     bool forceRefresh = false,
   }) async {
-    if (!forceRefresh && _foldersByCategory.containsKey(categoryId)) return;
+    if (!forceRefresh && _itemsByPath.containsKey(path)) return;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
-      final folders = await _repository.getFolders(classId, categoryId);
-      _foldersByCategory[categoryId] = folders;
+      _itemsByPath[path] = await _repository.listContent(classId, path);
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -95,73 +47,23 @@ class FilesProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> createFolder(
-    String classId,
-    String categoryId,
-    String name,
-  ) async {
+  // ─── Create ────────────────────────────────────────────────────────────────
+
+  Future<bool> createFolder(String classId, String path) async {
     try {
-      final created = await _repository.createFolder(classId, categoryId, name);
-      final existing = _foldersByCategory[categoryId] ?? [];
-      _foldersByCategory[categoryId] = [...existing, created];
-      notifyListeners();
+      await _repository.createFolder(classId, path);
+      await _refreshParent(classId, path);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
       return false;
-    }
-  }
-
-  Future<bool> deleteFolder(
-    String classId,
-    String categoryId,
-    String folderId,
-  ) async {
-    try {
-      await _repository.deleteFolder(classId, categoryId, folderId);
-      final existing = _foldersByCategory[categoryId];
-      if (existing != null) {
-        _foldersByCategory[categoryId] = existing
-            .where((f) => f.id != folderId)
-            .toList();
-      }
-      _filesByFolder.remove(folderId);
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // ─── Files ─────────────────────────────────────────────────────────────────
-
-  /// Lazy fetch — skips API call if data already cached for [folderId].
-  Future<void> fetchFiles(
-    String classId,
-    String folderId, {
-    bool forceRefresh = false,
-  }) async {
-    if (!forceRefresh && _filesByFolder.containsKey(folderId)) return;
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      final files = await _repository.getFiles(classId, folderId);
-      _filesByFolder[folderId] = files;
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
   Future<bool> uploadFile(
     String classId,
-    String folderId,
+    String targetPath,
     String filePath,
     String fileName,
   ) async {
@@ -169,15 +71,8 @@ class FilesProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      final uploaded = await _repository.uploadFile(
-        classId,
-        folderId,
-        filePath,
-        fileName,
-      );
-      final existing = _filesByFolder[folderId] ?? [];
-      _filesByFolder[folderId] = [...existing, uploaded];
-      notifyListeners();
+      await _repository.uploadFile(classId, targetPath, filePath, fileName);
+      await _refreshParent(classId, targetPath);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -189,9 +84,12 @@ class FilesProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> getDownloadUrl(String fileId) async {
+  // ─── Download ──────────────────────────────────────────────────────────────
+
+  /// Always fetches a fresh presigned URL — never cached.
+  Future<String?> getDownloadUrl(String classId, String filePath) async {
     try {
-      return await _repository.getDownloadUrl(fileId);
+      return await _repository.getDownloadUrl(classId, filePath);
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
@@ -199,25 +97,25 @@ class FilesProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> deleteFile(
-    String classId,
-    String folderId,
-    String fileId,
-  ) async {
+  // ─── Delete ────────────────────────────────────────────────────────────────
+
+  Future<bool> deleteContent(String classId, String path) async {
     try {
-      await _repository.deleteFile(fileId);
-      final existing = _filesByFolder[folderId];
-      if (existing != null) {
-        _filesByFolder[folderId] = existing
-            .where((f) => f.id != fileId)
-            .toList();
-      }
-      notifyListeners();
+      await _repository.deleteContent(classId, path);
+      await _refreshParent(classId, path);
       return true;
     } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
       return false;
     }
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  Future<void> _refreshParent(String classId, String childPath) async {
+    final parent = _parentOf(childPath);
+    _itemsByPath.remove(parent);
+    await fetchContent(classId, parent, forceRefresh: true);
   }
 }

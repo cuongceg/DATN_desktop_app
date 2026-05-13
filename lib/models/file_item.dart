@@ -4,6 +4,7 @@ class FileItem {
   final bool isFolder;
   final String modifiedDate;
   final String modifiedBy;
+  final String path;
   final List<FileItem> children;
 
   FileItem({
@@ -12,6 +13,7 @@ class FileItem {
     this.isFolder = false,
     this.modifiedDate = '',
     this.modifiedBy = '',
+    this.path = '',
     this.children = const [],
   });
 }

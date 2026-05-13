@@ -673,7 +673,7 @@ class _MeetNowClassPickerDialog extends StatelessWidget {
       child: ListView.separated(
         shrinkWrap: true,
         itemCount: classes.length,
-        separatorBuilder: (_, __) =>
+        separatorBuilder: (_, _) =>
             const Divider(height: 1, indent: 16, endIndent: 16),
         itemBuilder: (BuildContext ctx, int i) => _ClassPickerTile(
           classroom: classes[i],
