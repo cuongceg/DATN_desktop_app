@@ -38,7 +38,6 @@ class PostsProvider extends ChangeNotifier {
         limit: _pageSize,
         offset: _currentOffset,
       );
-      debugPrint('PostsProvider: getPosts: $result');
       _posts = result.posts;
       _totalCount = result.totalCount;
       _hasMore = _posts.length < _totalCount;

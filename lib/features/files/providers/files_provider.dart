@@ -23,6 +23,12 @@ class FilesProvider extends ChangeNotifier {
   bool get isUploading => _isUploading;
   String? get errorMessage => _errorMessage;
 
+  /// Clears cached folders/files so subsequent navigation triggers fresh fetches.
+  void clearCache() {
+    _foldersByCategory.clear();
+    _filesByFolder.clear();
+  }
+
   // ─── Categories ────────────────────────────────────────────────────────────
 
   Future<void> fetchCategories(String classId) async {
@@ -69,8 +75,12 @@ class FilesProvider extends ChangeNotifier {
   // ─── Folders ───────────────────────────────────────────────────────────────
 
   /// Lazy fetch — skips API call if data already cached for [categoryId].
-  Future<void> fetchFolders(String classId, String categoryId) async {
-    if (_foldersByCategory.containsKey(categoryId)) return;
+  Future<void> fetchFolders(
+    String classId,
+    String categoryId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _foldersByCategory.containsKey(categoryId)) return;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -78,7 +88,6 @@ class FilesProvider extends ChangeNotifier {
       final folders = await _repository.getFolders(classId, categoryId);
       _foldersByCategory[categoryId] = folders;
     } catch (e) {
-      debugPrint('folder error: ${e.toString()}');
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
@@ -130,8 +139,12 @@ class FilesProvider extends ChangeNotifier {
   // ─── Files ─────────────────────────────────────────────────────────────────
 
   /// Lazy fetch — skips API call if data already cached for [folderId].
-  Future<void> fetchFiles(String classId, String folderId) async {
-    if (_filesByFolder.containsKey(folderId)) return;
+  Future<void> fetchFiles(
+    String classId,
+    String folderId, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _filesByFolder.containsKey(folderId)) return;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -139,7 +152,6 @@ class FilesProvider extends ChangeNotifier {
       final files = await _repository.getFiles(classId, folderId);
       _filesByFolder[folderId] = files;
     } catch (e) {
-      debugPrint('file error: ${e.toString()}');
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;

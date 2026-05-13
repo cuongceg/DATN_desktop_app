@@ -55,7 +55,9 @@ class _DocumentManagementScreenState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<FilesProvider>().fetchCategories(widget.classId);
+        final provider = context.read<FilesProvider>();
+        provider.clearCache();
+        provider.fetchCategories(widget.classId);
       }
     });
   }
@@ -173,7 +175,8 @@ class _DocumentManagementScreenState
               ),
             ];
           });
-          provider.fetchFolders(widget.classId, item.id);
+          provider.fetchFolders(widget.classId, item.id, forceRefresh: true);
+          break;
         case _NavLevel.category:
           setState(() {
             _navStack = [
@@ -185,7 +188,8 @@ class _DocumentManagementScreenState
               ),
             ];
           });
-          provider.fetchFiles(widget.classId, item.id);
+          provider.fetchFiles(widget.classId, item.id, forceRefresh: true);
+          break;
         case _NavLevel.folder:
           break;
       }
@@ -198,16 +202,32 @@ class _DocumentManagementScreenState
     setState(() {
       _navStack = _navStack.sublist(0, index + 1);
     });
+
+    final provider = context.read<FilesProvider>();
+    switch (_currentLevel) {
+      case _NavLevel.root:
+        provider.fetchCategories(widget.classId);
+        break;
+      case _NavLevel.category:
+        provider.fetchFolders(widget.classId, _currentId!, forceRefresh: false);
+        break;
+      case _NavLevel.folder:
+        provider.fetchFiles(widget.classId, _currentId!, forceRefresh: false);
+        break;
+    }
   }
 
   void _retryFetch(FilesProvider provider) {
     switch (_currentLevel) {
       case _NavLevel.root:
         provider.fetchCategories(widget.classId);
+        break;
       case _NavLevel.category:
-        provider.fetchFolders(widget.classId, _currentId!);
+        provider.fetchFolders(widget.classId, _currentId!, forceRefresh: true);
+        break;
       case _NavLevel.folder:
-        provider.fetchFiles(widget.classId, _currentId!);
+        provider.fetchFiles(widget.classId, _currentId!, forceRefresh: true);
+        break;
     }
   }
 
@@ -333,6 +353,10 @@ class _DocumentManagementScreenState
       file.path!,
       file.name,
     );
+
+    // Ensure UI matches server state even if upload response parsing fails.
+    if (!context.mounted) return;
+    await provider.fetchFiles(widget.classId, _currentId!, forceRefresh: true);
   }
 
   Future<void> _handleDelete(
@@ -370,10 +394,13 @@ class _DocumentManagementScreenState
     switch (_currentLevel) {
       case _NavLevel.root:
         await provider.deleteCategory(widget.classId, item.id);
+        break;
       case _NavLevel.category:
         await provider.deleteFolder(widget.classId, _currentId!, item.id);
+        break;
       case _NavLevel.folder:
         await provider.deleteFile(widget.classId, _currentId!, item.id);
+        break;
     }
   }
 

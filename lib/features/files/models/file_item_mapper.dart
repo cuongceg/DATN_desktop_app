@@ -1,16 +1,13 @@
 import 'package:flutter_web_rtc/models/file_item.dart';
+import 'package:intl/intl.dart';
 import 'category_model.dart';
 import 'class_file_model.dart';
 import 'folder_model.dart';
 
-const _monthAbbr = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
+final DateFormat _fullDateTimeFormat = DateFormat('dd/MM/yyyy - HH:mm:ss');
 
-String _shortDate(DateTime dt) {
-  final d = dt.day.toString().padLeft(2, '0');
-  return '$d ${_monthAbbr[dt.month - 1]}';
+String _fullDateTime(DateTime dt) {
+  return _fullDateTimeFormat.format(dt.toLocal());
 }
 
 /// Category → FileItem (isFolder: true, children = mapped folders).
@@ -19,7 +16,7 @@ FileItem categoryToFileItem(CategoryModel c, List<FolderModel> folders) {
     id: c.id,
     name: c.name,
     isFolder: true,
-    modifiedDate: _shortDate(c.createdAt),
+    modifiedDate: _fullDateTime(c.createdAt),
     modifiedBy: '',
     children: folders.map((f) => folderToFileItem(f, const [])).toList(),
   );
@@ -31,7 +28,7 @@ FileItem folderToFileItem(FolderModel f, List<ClassFileModel> files) {
     id: f.id,
     name: f.name,
     isFolder: true,
-    modifiedDate: _shortDate(f.createdAt),
+    modifiedDate: _fullDateTime(f.createdAt),
     modifiedBy: '',
     children: files.map(classFileToFileItem).toList(),
   );
@@ -43,7 +40,7 @@ FileItem classFileToFileItem(ClassFileModel f) {
     id: f.id,
     name: f.originalName,
     isFolder: false,
-    modifiedDate: _shortDate(f.createdAt),
+    modifiedDate: _fullDateTime(f.createdAt),
     modifiedBy: f.uploadedByName,
   );
 }
